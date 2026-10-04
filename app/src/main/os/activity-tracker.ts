@@ -21,6 +21,7 @@ export class ActivityTracker {
   private mouseWrite = 0
   private mouseCount = 0
 
+  private tickBaselineSet = false
   private lastTypingEmitMs = -Infinity
   private lastKeysPerSec = 0
   private lastMouseEmitMs = -Infinity
@@ -101,6 +102,16 @@ export class ActivityTracker {
   }
 
   tick(tMs: number, idleSeconds: number): ActivityEvent[] {
+    // Baseline every throttle on the first tick call, so the very first qualifying tick doesn't
+    // fire immediately — the periodic emissions (every 500ms/100ms/1000ms) count from whenever
+    // ticking actually started, not from -Infinity.
+    if (this.tickBaselineSet === false) {
+      this.tickBaselineSet = true
+      this.lastTypingEmitMs = tMs
+      this.lastMouseEmitMs = tMs
+      this.lastIdleEmitMs = tMs
+    }
+
     const events: ActivityEvent[] = []
 
     const { keysPerSec, backspaceRatio } = this.typing(tMs)

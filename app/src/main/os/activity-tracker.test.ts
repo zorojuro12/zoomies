@@ -61,3 +61,61 @@ describe('ActivityTracker.mouseSpeed', () => {
     expect(tracker.mouseSpeed(0)).toBe(0)
   })
 })
+
+describe('ActivityTracker.tick', () => {
+  function typingEvents(events: ReturnType<ActivityTracker['tick']>): number[] {
+    return events
+      .filter((e) => e.kind === 'typing')
+      .map((e) => (e as { keysPerSec: number }).keysPerSec)
+  }
+
+  it('emits a typing event every 500ms while typing, then exactly one zero event when it stops', () => {
+    const tracker = new ActivityTracker()
+    tracker.key(0, false)
+
+    const seen: Array<{ t: number; keysPerSec: number[] }> = []
+    for (let t = 0; t <= 1000; t += 100) {
+      seen.push({ t, keysPerSec: typingEvents(tracker.tick(t, 0)) })
+    }
+    const emittedAt = seen.filter((s) => s.keysPerSec.length > 0).map((s) => s.t)
+    expect(emittedAt).toEqual([500, 1000])
+    expect(seen.find((s) => s.t === 500)?.keysPerSec).toEqual([0.5])
+
+    // The key ages out of the 2s window exactly at t=2000 (counts only while t > tMs - 2000).
+    expect(typingEvents(tracker.tick(2000, 0))).toEqual([0])
+
+    for (let t = 2100; t <= 3000; t += 100) {
+      expect(typingEvents(tracker.tick(t, 0))).toEqual([])
+    }
+  })
+
+  it('emits idle events every 1000ms carrying the idle seconds passed in', () => {
+    const tracker = new ActivityTracker()
+    const idleAt: number[] = []
+    for (let t = 0; t <= 3000; t += 100) {
+      const events = tracker.tick(t, t / 10)
+      if (events.some((e) => e.kind === 'idle')) idleAt.push(t)
+    }
+    expect(idleAt).toEqual([1000, 2000, 3000])
+  })
+
+  it('emits mouse events at most every 100ms, with the last sample’s position', () => {
+    const tracker = new ActivityTracker()
+    for (let t = 0; t <= 300; t += 10) tracker.mouse(t, t, t * 2)
+
+    const mouseAt: Array<{ t: number; x: number; y: number }> = []
+    for (let t = 0; t <= 300; t += 100) {
+      const events = tracker.tick(t, 0)
+      const m = events.find((e) => e.kind === 'mouse')
+      if (m && m.kind === 'mouse') mouseAt.push({ t, x: m.x, y: m.y })
+    }
+    expect(mouseAt.map((m) => m.t)).toEqual([100, 200, 300])
+    expect(mouseAt[mouseAt.length - 1]).toEqual({ t: 300, x: 300, y: 600 })
+  })
+
+  it('emits no mouse event when there are no samples', () => {
+    const tracker = new ActivityTracker()
+    const events = tracker.tick(100, 0)
+    expect(events.some((e) => e.kind === 'mouse')).toBe(false)
+  })
+})
