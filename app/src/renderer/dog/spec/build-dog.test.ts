@@ -169,6 +169,48 @@ describe('buildDog: face and colours', () => {
   })
 })
 
+describe('buildDog: nose and eyes are actually visible on the face', () => {
+  const specs = [{}, { proportions: { headSize: 1.25, snoutLength: 0.9, snoutWidth: 1.2 } }]
+  for (const [i, spec] of specs.entries()) {
+    describe(`face #${i}`, () => {
+      const d = buildDog(spec)
+      const head = shape(d, 'head').params[0]!
+      it('the nose sticks out past the tip of the snout', () => {
+        const snout = shape(d, 'snout')
+        const [, rB, length] = snout.params
+        const snoutTip = snout.offset[0] + length! + rB! // far end of the snout's rounded tip
+        const nose = shape(d, 'nose')
+        expect(nose.offset[0] + nose.params[0]!).toBeGreaterThan(snoutTip)
+      })
+      it('the eyes poke out of the head surface (not buried, not floating)', () => {
+        const eye = shape(d, 'eye_l')
+        const centre = Math.hypot(...eye.offset)
+        const outerEdge = centre + eye.params[0]!
+        expect(outerEdge).toBeGreaterThan(head) // visible
+        expect(outerEdge).toBeLessThan(head + 0.2 * head) // still attached
+      })
+      it('the eyes face forward, not out to the extreme sides', () => {
+        const eye = shape(d, 'eye_l')
+        expect(Math.abs(eye.offset[2])).toBeLessThanOrEqual(0.62 * head) // z within ~62% of the head radius
+        expect(eye.offset[0]).toBeGreaterThan(0.6 * head) // well forward of the head centre
+      })
+    })
+  }
+})
+
+describe('buildDog: the blaze is a flat marking, not a bump', () => {
+  for (const headSize of [1, 1.3]) {
+    it(`stays within 2px of the head surface (headSize ${headSize})`, () => {
+      const d = buildDog({ proportions: { headSize } })
+      const head = shape(d, 'head').params[0]! // head sphere radius
+      const blaze = shape(d, 'blaze')
+      const centre = Math.hypot(...blaze.offset)
+      const reach = centre + Math.max(...blaze.params) // furthest the blaze can stick out
+      expect(reach).toBeLessThanOrEqual(head + 2 * headSize)
+    })
+  }
+})
+
 describe('buildDog: properties that must hold for EVERY spec', () => {
   const specs: object[] = [
     {},

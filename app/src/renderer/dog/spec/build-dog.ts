@@ -166,15 +166,10 @@ export function buildDog(input: unknown): DogFile {
     6,
     'muzzle'
   )
-  add(
-    'nose',
-    'sphere',
-    'head',
-    [3.4 * hs * p.snoutWidth],
-    [8 * hs + snoutLen - 1.5 * hs, 4.2 * hs, 0],
-    1,
-    'nose'
-  )
+  // Nose: a ball at the very tip of the snout, poking ~60% of its radius past the rounded end.
+  const noseR = 3.4 * hs * p.snoutWidth
+  const snoutTipX = 8 * hs + snoutLen + 6 * hs * p.snoutWidth
+  add('nose', 'sphere', 'head', [noseR], [snoutTipX - 0.4 * noseR, 4.2 * hs, 0], 1, 'nose')
 
   // Face detail (mirrored left/right)
   for (const [side, z] of [
@@ -186,7 +181,7 @@ export function buildDog(input: unknown): DogFile {
       'sphere',
       'head',
       [2.8 * hs],
-      [8.8 * hs, -4 * hs, z * 12.8 * hs],
+      [12.1 * hs, -3.2 * hs, z * 10 * hs], // on the front of the head surface, facing forward
       0.5,
       'eyes'
     )
@@ -209,12 +204,14 @@ export function buildDog(input: unknown): DogFile {
       'brows'
     )
   }
+  // Blaze: a thin plate on the midline of the forehead. It is a COLOUR marking, so it sits almost
+  // flush with the head (centre 13 from the head centre + ~5.5 reach ≈ 18.5 vs a 17 head radius).
   add(
     'blaze',
     'ellipsoid',
     'head',
-    [10 * hs, 3 * hs, 3.2 * hs],
-    [6 * hs, -15.8 * hs, 0],
+    [5 * hs, 5.5 * hs, 2.8 * hs],
+    [8.3 * hs, -10 * hs, 0],
     3,
     'blaze'
   )
