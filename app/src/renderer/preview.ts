@@ -97,6 +97,9 @@ async function start(): Promise<void> {
     for (const mood of ['happy', 'curious', 'sleepy', 'alert', 'neutral'] as const) {
       button(`mood: ${mood}`, () => dog.setMood(mood))
     }
+    for (const trick of ['yawn', 'sniff', 'shake'] as const) {
+      button(`idle: ${trick}`, () => void dog.playIdle(trick))
+    }
     button('polish: on/off', () => {
       polishOn = !polishOn
       dog.setPolish(polishOn)

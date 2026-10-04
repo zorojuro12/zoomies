@@ -13,6 +13,7 @@ import { DogMotion } from '../motion/dog-motion'
 import { shapeBound, unionSphereInto } from './bounds'
 import { debugColor, debugFlags } from './debug-view'
 import { createBlink, stepBlink } from '../motion/blink'
+import type { IdleName } from '../motion/idles'
 import type { MoodName } from '../motion/mood'
 import { sampleFur } from '../fur/fur'
 import { FurCoat } from '../fur/fur-renderer'
@@ -101,11 +102,17 @@ export class SdfDog implements DogView, DogController {
     this.m.setMood(name, intensity)
   }
 
+  /** Play an idle trick (yawn, sniff, shake) on the spot; does nothing if the dog is busy. */
+  playIdle(name: IdleName): Promise<void> {
+    return this.m.playIdle(name)
+  }
+
   /** Turn the extra motion polish on or off (anticipation before jumps, moods, standing life). */
   setPolish(on: boolean): void {
     this.m.polish.anticipation = on
     this.m.polish.mood = on
     this.m.polish.idle = on
+    this.m.polish.idleTricks = on
   }
 
   // ---- DogView -------------------------------------------------------------------------

@@ -21,6 +21,8 @@ import type { GaitDef, LegId } from './gait'
 import { solveLegToGround } from './leg-solve'
 import type { LegGeometry } from './leg-solve'
 import { createIdleLife, noteActivity, stepIdleLife } from './idle-life'
+import { IDLE_NAMES, IDLES, createOffsets, sampleIdle, scaleOffsets } from './idles'
+import type { IdleName } from './idles'
 import { createMood, setMoodTarget, stepMood } from './mood'
 import type { MoodName } from './mood'
 import { blendPose, copyPose, POSES } from './poses'
@@ -88,7 +90,7 @@ export class DogMotion implements DogController {
   readonly root = new THREE.Group()
   readonly rig: DogRig
   /** Switches for the extra polish; set a flag to false to get the plain motion back. */
-  readonly polish = { anticipation: true, mood: true, idle: true }
+  readonly polish = { anticipation: true, mood: true, idle: true, idleTricks: true }
 
   // geometry taken from the dog file
   private readonly legs: Leg[]
@@ -138,6 +140,14 @@ export class DogMotion implements DogController {
   private neckPitch = 0
   private readonly mood = createMood()
   private readonly idle = createIdleLife(7)
+  // the idle trick being played (a yawn, sniff or shake), and the pose with its offsets added
+  private trickName: IdleName | null = null
+  private trickT = 0
+  private trickW = 0
+  private trickEnding = false
+  private trickResolve: (() => void) | null = null
+  private readonly trick = createOffsets()
+  private readonly eff: PoseParams = { ...POSES.stand! }
   private readonly earSpring: SpringState = { x: 0, v: 0 }
   // per-leg paw targets for the current frame (reused every frame)
   private readonly footX = new Float64Array(4)
@@ -241,6 +251,7 @@ export class DogMotion implements DogController {
   setPose(pose: PoseName, opts?: { durationMs?: number }): Promise<void> {
     if (!PUBLIC_POSES.has(pose)) return Promise.resolve()
     noteActivity(this.idle)
+    this.cancelTrick()
     this.finishPendingPose()
     this.standTimer = 0
     this.publicPose = pose
@@ -253,6 +264,7 @@ export class DogMotion implements DogController {
 
   moveTo(x: number, y: number, gait: Gait): Promise<void> {
     noteActivity(this.idle)
+    this.cancelTrick()
     this.finishMotion()
     this.gait = GAITS[gait]
     if (this.publicPose !== 'stand') void this.setPose('stand', { durationMs: 150 })
@@ -270,6 +282,7 @@ export class DogMotion implements DogController {
 
   jumpTo(x: number, y: number, opts?: { apexPx?: number }): Promise<void> {
     noteActivity(this.idle)
+    this.cancelTrick()
     this.finishMotion()
     const apex = opts?.apexPx ?? 80
     const peakY = Math.min(this.y, y) - apex
@@ -314,9 +327,29 @@ export class DogMotion implements DogController {
     setMoodTarget(this.mood, this.polish.mood ? name : 'neutral', intensity)
   }
 
+  /**
+   * Play a short idle trick (yawn, sniff, shake) on the spot. Resolves when it is done or a command
+   * cancels it. Does nothing (resolves at once) unless the dog is standing with nothing to do.
+   */
+  playIdle(name: IdleName): Promise<void> {
+    if (!this.polish.idle || !this.isStanding() || this.trickName) return Promise.resolve()
+    this.trickName = name
+    this.trickT = 0
+    this.trickW = 1
+    this.trickEnding = false
+    return new Promise((resolve) => {
+      this.trickResolve = resolve
+    })
+  }
+
+  /** The idle trick being played right now, or null. */
+  getIdle(): IdleName | null {
+    return this.trickEnding ? null : this.trickName
+  }
+
   /** How far the mood holds the eyelids shut (0..0.6); SdfDog adds it to the blink. */
   getLidDroop(): number {
-    return this.mood.values.lid
+    return Math.max(this.mood.values.lid, this.trick.lid)
   }
 
   attachBall(attached: boolean): void {
@@ -372,16 +405,57 @@ export class DogMotion implements DogController {
     this.clock += dt
     if (!this.polish.mood) setMoodTarget(this.mood, 'neutral', 0)
     stepMood(this.mood, dt)
-    const standing =
-      this.motion.kind === 'none' &&
-      this.publicPose === 'stand' &&
-      this.standTimer === 0 &&
-      this.poseT >= 1
-    stepIdleLife(this.idle, dt, this.polish.idle && standing)
+    stepIdleLife(this.idle, dt, this.polish.idle && this.isStanding(), this.trickName !== null)
+    this.updateTrick(dt)
     this.integrateMotion(dt)
     this.updatePoseBlend(dt)
     this.updateYaw(dt)
     this.applyFrame(dt)
+  }
+
+  /** Standing with nothing to do (no move, jump, pose change or settle). */
+  private isStanding(): boolean {
+    return (
+      this.motion.kind === 'none' &&
+      this.publicPose === 'stand' &&
+      this.standTimer === 0 &&
+      this.poseT >= 1
+    )
+  }
+
+  private cancelTrick(): void {
+    if (!this.trickName) return
+    this.trickEnding = true
+    const r = this.trickResolve
+    this.trickResolve = null
+    r?.()
+  }
+
+  private updateTrick(dt: number): void {
+    // a bored dog asks for a trick now and then (the request is always taken, even if unused)
+    if (this.idle.trickReq >= 0) {
+      const name = IDLE_NAMES[this.idle.trickReq]!
+      this.idle.trickReq = -1
+      if (this.polish.idleTricks) void this.playIdle(name)
+    }
+    if (!this.trickName) {
+      sampleIdle('yawn', 0, this.trick) // all zero
+      return
+    }
+    if (!this.trickEnding) this.trickT += dt
+    this.trickW += ((this.trickEnding ? 0 : 1) - this.trickW) * (1 - Math.exp(-dt * 14))
+    const done = this.trickT >= IDLES[this.trickName].duration
+    if (done || (this.trickEnding && this.trickW < 0.02)) {
+      this.trickName = null
+      this.trickEnding = false
+      const r = this.trickResolve
+      this.trickResolve = null
+      r?.()
+      sampleIdle('yawn', 0, this.trick)
+      return
+    }
+    sampleIdle(this.trickName, this.trickT, this.trick)
+    scaleOffsets(this.trick, this.trickW)
   }
 
   private emit(kind: DogEvent['kind']): void {
@@ -524,7 +598,16 @@ export class DogMotion implements DogController {
   /** Pose the whole skeleton for this frame and update world matrices. */
   private applyFrame(dt: number): void {
     const rig = this.rig
-    const cur = this.cur
+    // the pose with any idle trick's offsets added (no allocation: a reused scratch pose)
+    const cur = this.eff
+    copyPose(cur, this.cur)
+    cur.drop += this.trick.drop
+    cur.pitch += this.trick.pitch
+    cur.neck += this.trick.neck
+    cur.head += this.trick.head
+    cur.headRoll += this.trick.roll
+    cur.jaw += this.trick.jaw
+    cur.tailBase += this.trick.tail
     const T = this.legTotal
     const s = this.scale
     const moving = this.moveW
@@ -568,7 +651,7 @@ export class DogMotion implements DogController {
     }
     bodyY += excess
     rig.node('body').position.y = bodyY
-    rig.setBone('body', pitch, 0, this.idle.sway) // sway = the weight shift (a roll about the forward axis)
+    rig.setBone('body', pitch, 0, this.idle.sway + this.trick.bodyRoll) // sway = the weight shift (a roll about the forward axis)
 
     // --- legs: IK aims each paw at its ground point ----------------------------------------------
     for (let i = 0; i < this.legs.length; i++) {
@@ -587,7 +670,7 @@ export class DogMotion implements DogController {
         ((cur.neck + mv.neck + this.idle.droop * 4) * DEG + this.neckPitch * 0.4 + breathNeck),
       this.neckYaw * 0.4
     )
-    const jawWiggle = cur.jaw > 10 ? Math.sin(this.clock * 14) * 3 : 0
+    const jawWiggle = this.cur.jaw > 10 ? Math.sin(this.clock * 14) * 3 : 0
     rig.setBone(
       'head',
       this.rest('head') + (cur.head + mv.head + this.idle.droop * 7) * DEG + this.lookPitch * 0.6,
@@ -608,7 +691,8 @@ export class DogMotion implements DogController {
     if (dt > 0) {
       const vy = (bodyY - this.prevBodyY + (this.y - this.prevY)) / dt
       const target =
-        -(this.speed * 0.03 + vy * 0.02) * DEG -
+        this.trick.ear -
+        (this.speed * 0.03 + vy * 0.02) * DEG -
         Math.max(-0.6, Math.min(1, this.earPerk + mv.ears)) * 12 * DEG
       if (this.idle.earKick !== 0) this.earSpring.v -= 5 // a quick flick of the ears
       stepSpring(this.earSpring, Math.max(-0.6, Math.min(0.6, target)), 160, 11, dt)

@@ -89,3 +89,46 @@ describe('boredom droop', () => {
     expect(s.droop).toBeLessThan(0.05)
   })
 })
+
+describe('idle trick schedule', () => {
+  const requests = (seed: number, seconds: number, standing: boolean): number[] => {
+    const s = createIdleLife(seed)
+    const out: number[] = []
+    for (let t = 0; t < seconds; t += 1 / 60) {
+      stepIdleLife(s, 1 / 60, standing)
+      if (s.trickReq >= 0) {
+        out.push(s.trickReq)
+        s.trickReq = -1 // consumed by the dog
+      }
+    }
+    return out
+  }
+  it('asks for a trick every 10 to 20 seconds of standing, naming one of the three tricks', () => {
+    const r = requests(5, 120, true)
+    expect(r.length).toBeGreaterThanOrEqual(120 / 20 - 1)
+    expect(r.length).toBeLessThanOrEqual(120 / 10 + 1)
+    for (const k of r) expect([0, 1, 2]).toContain(k)
+  })
+  it('never asks while the dog is busy', () => {
+    expect(requests(5, 120, false)).toEqual([])
+  })
+  it('does not ask again until the last request was taken', () => {
+    const s = createIdleLife(5)
+    for (let t = 0; t < 120; t += 1 / 60) stepIdleLife(s, 1 / 60, true)
+    expect(s.trickReq).toBeGreaterThanOrEqual(0) // still waiting to be consumed, not overwritten
+  })
+  it('is deterministic for a seed', () => {
+    expect(requests(9, 120, true)).toEqual(requests(9, 120, true))
+  })
+})
+
+describe('quiet (an idle trick is playing)', () => {
+  it('the weight shift fades away, but the dog stays bored: the droop does not reset', () => {
+    const s = createIdleLife(1)
+    run(s, DROOP_AFTER * 2, true)
+    expect(s.droop).toBeGreaterThan(0.9)
+    for (let t = 0; t < 3; t += 1 / 60) stepIdleLife(s, 1 / 60, true, true)
+    expect(Math.abs(s.sway)).toBeLessThan(1e-2 * SWAY_MAX)
+    expect(s.droop).toBeGreaterThan(0.9)
+  })
+})
