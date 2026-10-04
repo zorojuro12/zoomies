@@ -12,6 +12,7 @@
 //   --url    page to load (default http://localhost:5174/preview.html — check the dev log for the port)
 //   --click  button label(s) to click in order, comma separated (e.g. "sit" or "ball,run ↔");
 //            "wait:1500" pauses 1500 ms between clicks (e.g. "walk ↑,wait:1600,walk ↓")
+//   --eval   JavaScript to run in the page after the clicks (e.g. drive an editor slider), then 300 ms
 //   --wait   ms to wait after the last click before the shot (default 800)
 //   --zoom   page zoom factor, makes the small dog bigger (default 1)
 //   --size   WxH of the window in CSS px (default 900x600)
@@ -29,6 +30,7 @@ const clicks = arg('click', '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)
+const evalJs = arg('eval', '')
 const waitMs = Number(arg('wait', '800'))
 const zoom = Number(arg('zoom', '1'))
 const [width, height] = arg('size', '900x600').split('x').map(Number)
@@ -71,6 +73,10 @@ app.whenReady().then(async () => {
     )
     if (!found) console.error(`button not found: ${label}`)
     await sleep(120)
+  }
+  if (evalJs) {
+    await win.webContents.executeJavaScript(evalJs)
+    await sleep(300)
   }
   await sleep(waitMs)
 
