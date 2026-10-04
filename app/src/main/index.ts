@@ -1,6 +1,8 @@
-import { app, shell, BrowserWindow, Tray, Menu } from 'electron'
+import { app, shell, BrowserWindow, Tray, Menu, ipcMain } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { registerIpc } from './ipc-main'
+import { StubOsLayer } from './os/stub-os-layer'
 import { createAppWindow, isOverlayMode } from './overlay-window'
 
 let tray: Tray | null = null
@@ -33,6 +35,16 @@ function createMainWindow(): void {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
+
+  // StubOsLayer.setClickThrough is a no-op (it doesn't own a window) — until the real
+  // WindowsOsLayer lands in Task 4, the overlay itself handles the actual toggle here.
+  if (overlay) {
+    ipcMain.on('os:setClickThrough', (_e, v: unknown) => {
+      if (typeof v !== 'boolean') return
+      if (v) win.setIgnoreMouseEvents(true, { forward: true })
+      else win.setIgnoreMouseEvents(false)
+    })
+  }
 }
 
 // This method will be called when Electron has finished
@@ -51,6 +63,7 @@ app.whenReady().then(() => {
 
   void logActiveGpu()
   if (isOverlayMode()) createTray()
+  registerIpc(new StubOsLayer())
   createMainWindow()
 
   app.on('activate', function () {

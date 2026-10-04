@@ -1,8 +1,35 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { Rect } from '@shared/geometry'
+import type { ActivityEvent, WindowRect } from '@shared/os'
 
 // Custom APIs for renderer
 const api = {}
+
+// Typed bridge over `@shared/ipc` channels (Task 3 of a-p1-overlay.md). The renderer never sees
+// raw `ipcRenderer` — only this shaped API.
+const zoomies = {
+  getWindows: (): Promise<WindowRect[]> => ipcRenderer.invoke('os:windows'),
+  getWorkArea: (): Promise<Rect> => ipcRenderer.invoke('os:workArea'),
+  onWindows: (cb: (w: WindowRect[]) => void): (() => void) => {
+    const listener = (_e: unknown, w: WindowRect[]): void => cb(w)
+    ipcRenderer.on('os:windows', listener)
+    return () => ipcRenderer.removeListener('os:windows', listener)
+  },
+  onWorkArea: (cb: (r: Rect) => void): (() => void) => {
+    const listener = (_e: unknown, r: Rect): void => cb(r)
+    ipcRenderer.on('os:workArea', listener)
+    return () => ipcRenderer.removeListener('os:workArea', listener)
+  },
+  onActivity: (cb: (e: ActivityEvent) => void): (() => void) => {
+    const listener = (_e: unknown, ev: ActivityEvent): void => cb(ev)
+    ipcRenderer.on('os:activity', listener)
+    return () => ipcRenderer.removeListener('os:activity', listener)
+  },
+  setClickThrough: (enabled: boolean): void => {
+    ipcRenderer.send('os:setClickThrough', enabled)
+  }
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
@@ -11,6 +38,7 @@ if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
+    contextBridge.exposeInMainWorld('zoomies', zoomies)
   } catch (error) {
     console.error(error)
   }
@@ -19,4 +47,6 @@ if (process.contextIsolated) {
   window.electron = electronAPI
   // @ts-ignore (define in dts)
   window.api = api
+  // @ts-ignore (define in dts)
+  window.zoomies = zoomies
 }

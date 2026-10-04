@@ -1,6 +1,7 @@
 // App host (CP0): renders our dog (the Aussie, via createDog) in a normal window. Click to make it run there;
 // it watches the cursor. Lane A turns this into the transparent overlay in P1.
 import { createDog } from './dog/create-dog'
+import { ClickThroughGate } from './host/click-through'
 import { FrameStats } from './host/frame-stats'
 import { Hud } from './host/hud'
 import { createRenderContext } from './host/scene'
@@ -31,6 +32,17 @@ async function start(): Promise<void> {
     window.addEventListener('click', (e) => {
       void dog.moveTo(e.clientX, groundY(), 'run').then(() => dog.setPose('sit'))
     })
+  } else {
+    // The overlay starts click-through (main process ignores mouse events, forwarding them
+    // through); this gate flips it off only while the cursor is over the dog, with a hold so
+    // crossing the dog's edge doesn't flicker click-through state every frame.
+    const gate = new ClickThroughGate()
+    window.addEventListener('mousemove', (e) => {
+      const overInteractive = dog.hitTest(e.clientX, e.clientY)
+      const next = gate.update(performance.now(), overInteractive)
+      if (next !== null) window.zoomies.setClickThrough(next === 'clickThrough')
+    })
+    window.addEventListener('click', () => dog.setPose('sit'))
   }
 
   if (debug) {
