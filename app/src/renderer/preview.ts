@@ -372,6 +372,7 @@ async function start(): Promise<void> {
         behaviour.needs.energy = 0.1
       })
       button('pet (touch sensor)', () => behaviour.handleInput({ kind: 'pet', source: 'touch' }))
+      button('pet', () => behaviour.handleInput({ kind: 'pet', source: 'mouse' }))
       // the controller, faked: the joystick pulled back, the button tapped / held, a double-click = call
       button('joystick aim 2 s', () => {
         let n = 0
