@@ -17,8 +17,12 @@ export function sendTo<C extends IpcChannel>(
 export function registerIpc(
   os: OsLayer,
   onBuzz: (preset: BuzzerPreset) => void = () => {},
-  getSerialStatus: () => SerialStatus = () => ({ connected: false, port: null })
+  getSerialStatus: () => SerialStatus = () => ({ connected: false, port: null }),
+  interpret: (text: string) => Promise<string> = async () => 'error'
 ): void {
+  ipcMain.handle('command:interpret', (_e, v: unknown) =>
+    typeof v === 'string' ? interpret(v) : 'error'
+  )
   ipcMain.handle('serial:status', () => getSerialStatus())
   ipcMain.on('serial:buzzer', (_e, v: unknown) => {
     const p = (v as { preset?: unknown } | null)?.preset

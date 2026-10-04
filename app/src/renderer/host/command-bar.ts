@@ -8,11 +8,11 @@ export class CommandBar {
   private readonly root: HTMLDivElement
   private shown = false
 
-  /** `typed`: also show a text box (not in the click-through overlay, which cannot take keystrokes). */
+  /** `sendTyped`: also show a text box (not in the click-through overlay, which cannot take keystrokes). */
   constructor(
     parent: HTMLElement,
     private readonly send: (text: string) => void,
-    typed: boolean
+    sendTyped: ((text: string) => void) | null
   ) {
     const root = document.createElement('div')
     root.style.cssText =
@@ -27,14 +27,14 @@ export class CommandBar {
       b.addEventListener('click', () => this.send(name))
       root.appendChild(b)
     }
-    if (typed) {
+    if (sendTyped) {
       const input = document.createElement('input')
       input.placeholder = 'say something…'
       input.style.cssText = 'padding:5px 8px;border-radius:7px;border:0;width:150px'
       input.addEventListener('keydown', (e) => {
         e.stopPropagation() // typing a "c" must not hide the bar
         if (e.key === 'Enter' && input.value.trim()) {
-          this.send(input.value)
+          sendTyped(input.value)
           input.value = ''
         }
       })

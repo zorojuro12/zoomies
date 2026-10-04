@@ -40,6 +40,7 @@ const zoomies = {
   },
   getSerialStatus: (): Promise<{ connected: boolean; port: string | null }> =>
     ipcRenderer.invoke('serial:status'),
+  interpret: (text: string): Promise<string> => ipcRenderer.invoke('command:interpret', text),
   buzz: (preset: BuzzerPreset): void => {
     ipcRenderer.send('serial:buzzer', { preset })
   },

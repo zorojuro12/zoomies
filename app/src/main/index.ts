@@ -2,6 +2,8 @@ import { app, shell, BrowserWindow, Tray, Menu } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { sendTo, registerIpc } from './ipc-main'
+import { loadDotenvFiles } from './services/dotenv'
+import { interpretCommand } from './services/gemini-command'
 import { createSerialDriver } from './hardware/serial-driver'
 import { startSerialService } from './hardware/serial-service'
 import { createOsLayer } from './os/create-os-layer'
@@ -23,6 +25,9 @@ async function logActiveGpu(): Promise<void> {
     console.log('[gpu] no active device reported')
   }
 }
+
+// Dev: pick up the API keys from the gitignored .env (never overrides real environment variables).
+loadDotenvFiles(process.env)
 
 function createTray(): void {
   tray = new Tray(icon)
@@ -49,7 +54,17 @@ function createMainWindow(): void {
     sendStatus: (s) => sendTo(win, 'serial:status', s)
   })
   app.on('will-quit', () => serial.stop())
-  registerIpc(os, serial.buzz, () => serial.reader?.status ?? { connected: false, port: null })
+  registerIpc(
+    os,
+    serial.buzz,
+    () => serial.reader?.status ?? { connected: false, port: null },
+    // free text -> one of the dog's commands (Gemini function calling; 'error' = use the word list)
+    (text) =>
+      interpretCommand(text, {
+        apiKey: process.env.GEMINI_API_KEY,
+        model: process.env.GEMINI_MODEL || undefined
+      })
+  )
   if (os instanceof WindowsOsLayer) {
     os.start(
       win,

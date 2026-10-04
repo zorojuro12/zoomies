@@ -8,6 +8,7 @@ const activity = []
 const inputs = []
 const statuses = []
 const buzzed = []
+let interpretAnswer = 'error'
 contextBridge.exposeInMainWorld('zoomies', {
   getWindows: () => Promise.resolve([]),
   getWorkArea: () =>
@@ -27,6 +28,7 @@ contextBridge.exposeInMainWorld('zoomies', {
     return () => {}
   },
   getSerialStatus: () => Promise.resolve({ connected: false, port: null }),
+  interpret: () => Promise.resolve(interpretAnswer),
   buzz: (p) => {
     buzzed.push(p)
   },
@@ -34,6 +36,9 @@ contextBridge.exposeInMainWorld('zoomies', {
 })
 contextBridge.exposeInMainWorld('__stub', {
   buzzed: () => buzzed,
+  answer: (a) => {
+    interpretAnswer = a
+  },
   input: (e) => {
     for (const cb of inputs) cb(e)
   },

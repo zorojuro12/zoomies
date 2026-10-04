@@ -12,6 +12,7 @@ import { timingFor } from './behaviour/timing'
 import { createDog } from './dog/create-dog'
 import { ClickThroughGate } from './host/click-through'
 import { CommandBar } from './host/command-bar'
+import { routeCommand } from './host/command-router'
 import { FrameStats } from './host/frame-stats'
 import { Hud, controllerHudText } from './host/hud'
 import { createRenderContext } from './host/scene'
@@ -65,10 +66,11 @@ async function start(): Promise<void> {
   window.zoomies.onSerialStatus(onSerialStatus)
   window.zoomies.onInput((e) => behaviour?.handleInput(e))
   // Clickable commands (and a text box in the windowed host): shown with ?commands=1 or the C key.
+  const send = (text: string): void => behaviour?.handleInput({ kind: 'command', text })
   const commandBar = new CommandBar(
     document.body,
-    (text) => behaviour?.handleInput({ kind: 'command', text }),
-    !overlay
+    send,
+    overlay ? null : (text) => void routeCommand(text, (t) => window.zoomies.interpret(t), send)
   )
   commandBar.setVisible(searchParams.get('commands') === '1')
   window.addEventListener('keydown', (e) => {

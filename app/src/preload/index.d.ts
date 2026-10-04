@@ -13,6 +13,7 @@ export interface ZoomiesApi {
   onInput(cb: (e: InputEvent) => void): () => void
   onSerialStatus(cb: (s: { connected: boolean; port: string | null }) => void): () => void
   getSerialStatus(): Promise<{ connected: boolean; port: string | null }>
+  interpret(text: string): Promise<string>
   buzz(preset: BuzzerPreset): void
   setClickThrough(enabled: boolean): void
 }
