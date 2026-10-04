@@ -18,8 +18,15 @@ export function registerIpc(
   os: OsLayer,
   onBuzz: (preset: BuzzerPreset) => void = () => {},
   getSerialStatus: () => SerialStatus = () => ({ connected: false, port: null }),
-  interpret: (text: string) => Promise<string> = async () => 'error'
+  interpret: (text: string) => Promise<string> = async () => 'error',
+  transcribeAudio: (audio: Uint8Array, mime: string) => Promise<string> = async () => ''
 ): void {
+  ipcMain.handle('speech:transcribe', (_e, v: unknown) => {
+    const { audio, mime } = (v ?? {}) as { audio?: unknown; mime?: unknown }
+    return audio instanceof Uint8Array && typeof mime === 'string'
+      ? transcribeAudio(audio, mime)
+      : ''
+  })
   ipcMain.handle('command:interpret', (_e, v: unknown) =>
     typeof v === 'string' ? interpret(v) : 'error'
   )

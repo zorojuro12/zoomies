@@ -12,7 +12,8 @@ export class CommandBar {
   constructor(
     parent: HTMLElement,
     private readonly send: (text: string) => void,
-    sendTyped: ((text: string) => void) | null
+    sendTyped: ((text: string) => void) | null,
+    onTalk: ((state: 'start' | 'stop') => void) | null = null
   ) {
     const root = document.createElement('div')
     root.style.cssText =
@@ -26,6 +27,17 @@ export class CommandBar {
         'padding:5px 10px;border:0;border-radius:7px;background:#e8eef2;color:#16212a;cursor:pointer'
       b.addEventListener('click', () => this.send(name))
       root.appendChild(b)
+    }
+    if (onTalk) {
+      // the mouse twin of the controller's button: hold it, speak, let go
+      const talk = document.createElement('button')
+      talk.textContent = 'Hold to talk'
+      talk.style.cssText =
+        'padding:5px 10px;border:0;border-radius:7px;background:#f4c542;color:#16212a;cursor:pointer'
+      talk.addEventListener('pointerdown', () => onTalk('start'))
+      for (const t of ['pointerup', 'pointerleave', 'pointercancel'] as const)
+        talk.addEventListener(t, () => onTalk('stop'))
+      root.appendChild(talk)
     }
     if (sendTyped) {
       const input = document.createElement('input')

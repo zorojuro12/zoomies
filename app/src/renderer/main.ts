@@ -13,6 +13,9 @@ import { createDog } from './dog/create-dog'
 import { ClickThroughGate } from './host/click-through'
 import { CommandBar } from './host/command-bar'
 import { routeCommand } from './host/command-router'
+import { createBrowserVoiceInput } from './host/voice-input'
+import { handleClip } from './host/voice-flow'
+import type { InputEvent } from '@shared/input'
 import { FrameStats } from './host/frame-stats'
 import { Hud, controllerHudText } from './host/hud'
 import { createRenderContext } from './host/scene'
@@ -64,13 +67,45 @@ async function start(): Promise<void> {
     hud.set('controller', controllerHudText(s))
   }
   window.zoomies.onSerialStatus(onSerialStatus)
-  window.zoomies.onInput((e) => behaviour?.handleInput(e))
+  // Push-to-talk: the mic is open ONLY while the button is held (controller, the on-screen button, or space).
+  const sendCommand = (text: string): void => behaviour?.handleInput({ kind: 'command', text })
+  const voice = createBrowserVoiceInput(
+    (bytes, mime) =>
+      void handleClip(
+        bytes,
+        mime,
+        async (b, m) => window.zoomies.transcribe(b, m),
+        (text) => void routeCommand(text, (t) => window.zoomies.interpret(t), sendCommand),
+        sendCommand
+      ),
+    (message) => console.warn(`[voice] ${message}`)
+  )
+  const input = (e: InputEvent): void => {
+    behaviour?.handleInput(e)
+    if (e.kind === 'pushToTalk') {
+      if (e.state === 'start') voice.start()
+      else voice.stop()
+    }
+  }
+  window.zoomies.onInput(input)
+  let spaceDown = false
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || e.repeat || spaceDown || e.target instanceof HTMLInputElement) return
+    spaceDown = true
+    input({ kind: 'pushToTalk', state: 'start' })
+  })
+  window.addEventListener('keyup', (e) => {
+    if (e.code !== 'Space' || !spaceDown) return
+    spaceDown = false
+    input({ kind: 'pushToTalk', state: 'stop' })
+  })
   // Clickable commands (and a text box in the windowed host): shown with ?commands=1 or the C key.
-  const send = (text: string): void => behaviour?.handleInput({ kind: 'command', text })
+  const send = sendCommand
   const commandBar = new CommandBar(
     document.body,
     send,
-    overlay ? null : (text) => void routeCommand(text, (t) => window.zoomies.interpret(t), send)
+    overlay ? null : (text) => void routeCommand(text, (t) => window.zoomies.interpret(t), send),
+    (state) => input({ kind: 'pushToTalk', state })
   )
   commandBar.setVisible(searchParams.get('commands') === '1')
   window.addEventListener('keydown', (e) => {

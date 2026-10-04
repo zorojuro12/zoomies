@@ -3,6 +3,7 @@ import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { sendTo, registerIpc } from './ipc-main'
 import { loadDotenvFiles } from './services/dotenv'
+import { transcribe } from './services/elevenlabs-stt'
 import { interpretCommand } from './services/gemini-command'
 import { createSerialDriver } from './hardware/serial-driver'
 import { startSerialService } from './hardware/serial-service'
@@ -44,6 +45,10 @@ function createMainWindow(): void {
     return { action: 'deny' }
   })
 
+  // The microphone is the only permission the window may ask for (push-to-talk, held-button only).
+  win.webContents.session.setPermissionRequestHandler((_wc, permission, done) =>
+    done(permission === 'media')
+  )
   const os = createOsLayer(overlay)
   // The controller (Arduino): its input and connection status go to the window; the dog's buzzer
   // requests come back. Does nothing, quietly, when no board or no serialport module is there.
@@ -63,7 +68,10 @@ function createMainWindow(): void {
       interpretCommand(text, {
         apiKey: process.env.GEMINI_API_KEY,
         model: process.env.GEMINI_MODEL || undefined
-      })
+      }),
+    // a push-to-talk recording -> the words (ElevenLabs); '' = nothing heard or it failed
+    async (audio, mime) =>
+      (await transcribe(audio, mime, { apiKey: process.env.ELEVENLABS_API_KEY })) ?? ''
   )
   if (os instanceof WindowsOsLayer) {
     os.start(

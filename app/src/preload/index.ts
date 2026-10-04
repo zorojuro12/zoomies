@@ -40,6 +40,8 @@ const zoomies = {
   },
   getSerialStatus: (): Promise<{ connected: boolean; port: string | null }> =>
     ipcRenderer.invoke('serial:status'),
+  transcribe: (audio: Uint8Array, mime: string): Promise<string> =>
+    ipcRenderer.invoke('speech:transcribe', { audio, mime }),
   interpret: (text: string): Promise<string> => ipcRenderer.invoke('command:interpret', text),
   buzz: (preset: BuzzerPreset): void => {
     ipcRenderer.send('serial:buzzer', { preset })

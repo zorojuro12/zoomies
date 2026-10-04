@@ -9,6 +9,7 @@ const inputs = []
 const statuses = []
 const buzzed = []
 let interpretAnswer = 'error'
+let transcribeAnswer = ''
 contextBridge.exposeInMainWorld('zoomies', {
   getWindows: () => Promise.resolve([]),
   getWorkArea: () =>
@@ -28,6 +29,7 @@ contextBridge.exposeInMainWorld('zoomies', {
     return () => {}
   },
   getSerialStatus: () => Promise.resolve({ connected: false, port: null }),
+  transcribe: () => Promise.resolve(transcribeAnswer),
   interpret: () => Promise.resolve(interpretAnswer),
   buzz: (p) => {
     buzzed.push(p)
@@ -36,6 +38,9 @@ contextBridge.exposeInMainWorld('zoomies', {
 })
 contextBridge.exposeInMainWorld('__stub', {
   buzzed: () => buzzed,
+  heard: (t) => {
+    transcribeAnswer = t
+  },
   answer: (a) => {
     interpretAnswer = a
   },
