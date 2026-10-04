@@ -1,5 +1,7 @@
 // App host (CP0): renders our dog (the Aussie, via createDog) in a normal window. Click to make it run there;
 // it watches the cursor. Lane A turns this into the transparent overlay in P1.
+import type { Rect } from '@shared/geometry'
+import type { WindowRect } from '@shared/os'
 import { createDog } from './dog/create-dog'
 import { ClickThroughGate } from './host/click-through'
 import { FrameStats } from './host/frame-stats'
@@ -10,21 +12,66 @@ const canvas = document.getElementById('stage') as HTMLCanvasElement
 const status = document.getElementById('status') as HTMLDivElement
 
 // ?overlay=1 (set by the main process) means we're the real transparent desktop overlay on
-// Windows: no click-to-call (clicks pass through), and the ground sits a bit higher to clear
-// the taskbar. Without it, this is the windowed host (Mac/WSL dev, or ZOOMIES_WINDOWED=1).
+// Windows: no click-to-call (clicks pass through), and the ground sits on the real work area's
+// bottom edge. Without it, this is the windowed host (Mac/WSL dev, or ZOOMIES_WINDOWED=1), where
+// the window is a small fixed-size preview box, not the real desktop.
 const searchParams = new URLSearchParams(window.location.search)
 const overlay = searchParams.get('overlay') === '1'
-// ?debug=1 (ZOOMIES_DEBUG=1): patrol back and forth so the overlay's GPU cost reflects constant
-// motion, not an idle stand — see Task 1 Checkpoint 2 in docs/plans/a-p1-overlay.md.
+// ?debug=1 (ZOOMIES_DEBUG=1): patrol back and forth (Task 1 Checkpoint 2) and draw a 1px outline
+// of every window rect from the OS layer (Task 4 Checkpoint 3) — proves the real/stub window list
+// is wired up; replaced by `world-view.ts` in Task 6.
 const debug = searchParams.get('debug') === '1'
 document.body.style.background = overlay ? 'transparent' : '#1d2a33'
 
+function createDebugCanvas(): CanvasRenderingContext2D | null {
+  if (!debug) return null
+  const el = document.createElement('canvas')
+  el.width = window.innerWidth
+  el.height = window.innerHeight
+  el.style.position = 'fixed'
+  el.style.inset = '0'
+  el.style.pointerEvents = 'none'
+  document.body.appendChild(el)
+  return el.getContext('2d')
+}
+
+function drawWindowOutlines(
+  ctx: CanvasRenderingContext2D | null,
+  windows: readonly WindowRect[]
+): void {
+  if (!ctx) return
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+  ctx.strokeStyle = '#00ff88'
+  ctx.lineWidth = 1
+  for (const w of windows) {
+    ctx.strokeRect(w.x + 0.5, w.y + 0.5, w.w - 1, w.h - 1)
+  }
+}
+
 async function start(): Promise<void> {
   const ctx = createRenderContext(canvas)
+
+  let workArea: Rect | null = await window.zoomies.getWorkArea()
+  const groundY = (): number =>
+    overlay && workArea ? workArea.y + workArea.h : window.innerHeight - (overlay ? 48 : 40)
+
+  const debugCtx = createDebugCanvas()
+  const hud = new Hud(status)
+  hud.set('activity', 'activity: -')
+
+  const onWindowsUpdate = (windows: readonly WindowRect[]): void => {
+    hud.set('world', `${windows.length} windows`)
+    drawWindowOutlines(debugCtx, windows)
+  }
+  onWindowsUpdate(await window.zoomies.getWindows())
+  window.zoomies.onWindows(onWindowsUpdate)
+  window.zoomies.onWorkArea((wa) => {
+    workArea = wa
+  })
+
   // createDog never leaves the host without a dog: bad spec file -> default dog; SDF dog fails to
   // start -> the placeholder (see dog/create-dog.ts).
   const dog = await createDog(ctx)
-  const groundY = (): number => window.innerHeight - (overlay ? 48 : 40)
   dog.placeAt(window.innerWidth / 2, groundY())
 
   window.addEventListener('mousemove', (e) => dog.lookAt({ x: e.clientX, y: e.clientY }))
@@ -57,9 +104,6 @@ async function start(): Promise<void> {
   }
 
   const stats = new FrameStats()
-  const hud = new Hud(status)
-  hud.set('world', 'world: -')
-  hud.set('activity', 'activity: -')
 
   let last = performance.now()
   const frame = (now: number): void => {

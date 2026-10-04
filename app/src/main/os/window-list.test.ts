@@ -64,7 +64,9 @@ describe('toWindowRects', () => {
 })
 
 describe('sameWindows', () => {
-  const a: WindowRect[] = [{ id: '1', title: 'A', x: 0, y: 0, w: 100, h: 100, z: 0, minimized: false }]
+  const a: WindowRect[] = [
+    { id: '1', title: 'A', x: 0, y: 0, w: 100, h: 100, z: 0, minimized: false }
+  ]
 
   it('is true for equal lists', () => {
     expect(sameWindows(a, [{ ...a[0] }])).toBe(true)
