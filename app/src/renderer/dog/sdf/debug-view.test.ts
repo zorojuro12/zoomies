@@ -46,15 +46,15 @@ describe('debugColor: one distinct colour per shape', () => {
 
 describe('debugFlags: what each view turns on', () => {
   it('normal shows neither the raw shapes nor the skeleton', () => {
-    expect(debugFlags('normal')).toEqual({ hardShapes: false, skeleton: false })
+    expect(debugFlags('normal')).toEqual({ hardShapes: false, skeleton: false, coatOnly: false })
   })
   it('shapes switches the shader to un-blended, per-shape colours', () => {
-    expect(debugFlags('shapes')).toEqual({ hardShapes: true, skeleton: false })
+    expect(debugFlags('shapes')).toEqual({ hardShapes: true, skeleton: false, coatOnly: false })
   })
   it('landmarks shows the skeleton over the normal dog', () => {
-    expect(debugFlags('landmarks')).toEqual({ hardShapes: false, skeleton: true })
+    expect(debugFlags('landmarks')).toEqual({ hardShapes: false, skeleton: true, coatOnly: false })
   })
-  it('coat (no splat coat yet) falls back to the normal view', () => {
-    expect(debugFlags('coat')).toEqual({ hardShapes: false, skeleton: false })
+  it('coat shows only the fur splats (the SDF body is hidden)', () => {
+    expect(debugFlags('coat')).toEqual({ hardShapes: false, skeleton: false, coatOnly: true })
   })
 })

@@ -13,8 +13,13 @@ import { DogMotion } from '../motion/dog-motion'
 import { shapeBound, unionSphereInto } from './bounds'
 import { debugColor, debugFlags } from './debug-view'
 import { createBlink, stepBlink } from '../motion/blink'
+import { sampleFur } from '../fur/fur'
+import { FurCoat } from '../fur/fur-renderer'
 import type { Sphere } from './bounds'
 import { MAX_SHAPES, SDF_FRAG, SDF_VERT } from './sdf-shader'
+
+/** How many fur strands to scatter over the dog. */
+const FUR_COUNT = 6000
 
 const KIND_INDEX: Record<ShapeKind, number> = { sphere: 0, capsule: 1, ellipsoid: 2, roundCone: 3 }
 
@@ -44,6 +49,11 @@ export class SdfDog implements DogView, DogController {
   private skelLines: THREE.LineSegments | null = null
   private skelPoints: THREE.Points | null = null
   private boneNames: string[] = []
+  // the fur coat (splat strands glued to the shapes); null until a dog is built
+  private coat: FurCoat | null = null
+  private furOn = true
+  private coatOnly = false
+  private hardShapes = false
   // blinking: the eyes' vertical radius shrinks for a moment every few seconds
   private readonly blink = createBlink(1)
   private eyeIdx: number[] = []
@@ -161,6 +171,30 @@ export class SdfDog implements DogView, DogController {
       }
     })
     this.buildSkeleton(dog)
+    this.buildCoat(dog)
+  }
+
+  /** Scatter the fur over the dog's rest-pose surface and glue it to the shapes (see dog/fur/). */
+  private buildCoat(dog: DogFile): void {
+    if (this.coat && this.scene) {
+      this.scene.remove(this.coat.mesh)
+      this.coat.dispose()
+    }
+    const fur = sampleFur(dog, FUR_COUNT, 1)
+    this.coat = new FurCoat(fur, dog.heightPx / 108)
+    this.scene!.add(this.coat.mesh)
+    this.refreshCoat()
+  }
+
+  /** The fur shows when it is switched on and we are not looking at the raw shapes; the fur-only view always shows it. */
+  private refreshCoat(): void {
+    if (this.coat) this.coat.visible = (this.furOn && !this.hardShapes) || this.coatOnly
+  }
+
+  /** Fur on/off (for comparing, and as a safety switch). */
+  setFur(on: boolean): void {
+    this.furOn = on
+    this.refreshCoat()
   }
 
   /** Bones as lines and joints as dots, hidden until the 'landmarks' x-ray view is chosen. */
@@ -267,6 +301,12 @@ export class SdfDog implements DogView, DogController {
       this.br[i] = this.boundR[i]!
       bounds[i]!.set(this.centre.x, this.centre.y, this.centre.z, this.boundR[i]!)
       inv[i]!.copy(this.shapeWorld).invert()
+      if (this.coat) this.coat.shapeMatrices[i]!.copy(this.shapeWorld)
+    }
+    if (this.coat) {
+      // the fur lies back along the body: the dog's backward axis as it appears on screen
+      this.skelPos.set(-1, 0, 0).transformDirection(this.boneNodes[0]!.matrixWorld)
+      this.coat.setFlow(this.skelPos.x, this.skelPos.y)
     }
     // One sphere around the whole dog: the shader rejects every ray outside it, and the quad is
     // sized to it (instead of a big square), so far fewer pixels are shaded at all.
@@ -310,6 +350,10 @@ export class SdfDog implements DogView, DogController {
     const flags = debugFlags(mode)
     this.uniforms.uHard.value = flags.hardShapes ? 1 : 0
     this.showSkeleton = flags.skeleton
+    this.coatOnly = flags.coatOnly
+    this.hardShapes = flags.hardShapes
+    if (this.quad) this.quad.visible = !flags.coatOnly
+    this.refreshCoat()
     if (this.skeleton) this.skeleton.visible = flags.skeleton
   }
 
