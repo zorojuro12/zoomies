@@ -58,6 +58,7 @@ export class SdfDog implements DogView, DogController {
   private readonly blink = createBlink(1)
   private eyeIdx: number[] = []
   private eyeRy: number[] = []
+  private eyeShut: number[] = [] // how far each closes: eyes to a slit, catchlights to nothing
   private boneParent: number[] = []
   private showSkeleton = false
   private readonly skelPos = new THREE.Vector3()
@@ -164,10 +165,12 @@ export class SdfDog implements DogView, DogController {
     this.shadowW = dog.heightPx * 1.4
     this.eyeIdx = []
     this.eyeRy = []
+    this.eyeShut = []
     dog.shapes.forEach((sh, i) => {
-      if (sh.id === 'eye_l' || sh.id === 'eye_r') {
+      if (/^(eye|glint)_/.test(sh.id)) {
         this.eyeIdx.push(i)
         this.eyeRy.push(sh.params[1] ?? sh.params[0] ?? 1)
+        this.eyeShut.push(sh.id.startsWith('glint') ? 0.99 : 0.92)
       }
     })
     this.buildSkeleton(dog)
@@ -285,7 +288,8 @@ export class SdfDog implements DogView, DogController {
     // Blink: squash each eye's height (axis y of the head frame) toward a thin slit and back.
     const closed = stepBlink(this.blink, dtMs / 1000)
     for (let k = 0; k < this.eyeIdx.length; k++) {
-      this.uniforms.uParams.value[this.eyeIdx[k]!]!.y = this.eyeRy[k]! * (1 - 0.92 * closed)
+      this.uniforms.uParams.value[this.eyeIdx[k]!]!.y =
+        this.eyeRy[k]! * (1 - this.eyeShut[k]! * closed)
     }
 
     // Per shape: the world -> shape-local matrix, and the world position of its bounding sphere.

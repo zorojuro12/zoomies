@@ -170,13 +170,13 @@ void main() {
 
   // Sky/ground ambient.
   float sky = clamp(-n.y * 0.5 + 0.5, 0.0, 1.0);
-  vec3 amb = mix(vec3(0.20, 0.17, 0.15), vec3(0.42, 0.46, 0.55), sky) * 0.55;
+  vec3 amb = mix(vec3(0.20, 0.17, 0.15), vec3(0.42, 0.46, 0.55), sky) * 0.7;
 
   vec3 lit = col * (keyCol * key + fillCol * fill + amb) * ao;
 
   // Rim light: a bright edge where the surface turns away from the viewer.
-  float rim = pow(1.0 - clamp(n.z, 0.0, 1.0), 3.0);
-  lit += vec3(1.0, 0.92, 0.82) * rim * 0.35 * ao;
+  float rim = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.5);
+  lit += vec3(1.0, 0.86, 0.72) * rim * 0.42 * ao;
 
   // Soft sheen so a black coat still shows its form.
   vec3 hv = normalize(L + vec3(0.0, 0.0, 1.0));
