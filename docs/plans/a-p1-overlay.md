@@ -142,18 +142,19 @@
 
 **Checkpoint 1: the gate**
 
-- [ ] **Step 1: Write failing tests** — Spec: (a) new gate, `update(0, false)` → `null`; (b) `update(0, true)` → `'interactive'`, then `update(16, true)` → `null`; (c) after interactive: `update(32, false)` → `null`, `update(100, false)` → `null`, `update(183, false)` → `'clickThrough'` (≥ 150 ms after 32); (d) interactive, `update(32, false)`, `update(80, true)`, `update(250, false)` → `null` (hold restarts at 250), `update(400, false)` → `'clickThrough'`.
-- [ ] **Step 2: Run** — `npx vitest run src/renderer/host/click-through.test.ts` → FAIL (module not found).
-- [ ] **Step 3: Implement** `ClickThroughGate` per Interfaces.
-- [ ] **Step 4: Run** → PASS, 4 tests.
-- [ ] **Step 5: Commit** — `npx vitest run src/renderer/host/click-through.test.ts && git add app/src/renderer/host/click-through.ts app/src/renderer/host/click-through.test.ts && git commit -m "feat: click-through gate with hold time"`
+- [x] **Step 1: Write failing tests** — Spec: (a) new gate, `update(0, false)` → `null`; (b) `update(0, true)` → `'interactive'`, then `update(16, true)` → `null`; (c) after interactive: `update(32, false)` → `null`, `update(100, false)` → `null`, `update(183, false)` → `'clickThrough'` (≥ 150 ms after 32); (d) interactive, `update(32, false)`, `update(80, true)`, `update(250, false)` → `null` (hold restarts at 250), `update(400, false)` → `'clickThrough'`.
+- [x] **Step 2: Run** — `npx vitest run src/renderer/host/click-through.test.ts` → FAIL (module not found).
+- [x] **Step 3: Implement** `ClickThroughGate` per Interfaces.
+- [x] **Step 4: Run** → PASS, 4 tests.
+- [x] **Step 5: Commit** — `npx vitest run src/renderer/host/click-through.test.ts && git add app/src/renderer/host/click-through.ts app/src/renderer/host/click-through.test.ts && git commit -m "feat: click-through gate with hold time"` → `eef0844`
 
 **Checkpoint 2 (manual): clicks pass through except on the dog**
 
-- [ ] **Step 1: Implement** — `ipc-main.ts`, preload API, `registerIpc(StubOsLayer)` for now (the Windows layer arrives in Task 4; `StubOsLayer.setClickThrough` is a no-op, so in this checkpoint the overlay window's `setIgnoreMouseEvents` is called from an `onClickThrough` callback passed by `index.ts`). Host: on every `mousemove` (forwarded while click-through) feed the gate and `dog.lookAt`; when it returns a state, call `window.zoomies.setClickThrough(state === 'clickThrough')`. Overlay mode: clicking the dog → `dog.setPose('sit')` (proves the click arrived).
-- [ ] **Step 2: Verify by hand** — Where: Windows demo laptop. Steps: `npm run dev`; click on the desktop/Notepad right next to the dog, then on the dog.
+- [x] **Step 1: Implement** — `ipc-main.ts`, preload API, `registerIpc(StubOsLayer)` for now (the Windows layer arrives in Task 4; `StubOsLayer.setClickThrough` is a no-op, so in this checkpoint the overlay window's `setIgnoreMouseEvents` is called from an `onClickThrough` callback passed by `index.ts`). Host: on every `mousemove` (forwarded while click-through) feed the gate and `dog.lookAt`; when it returns a state, call `window.zoomies.setClickThrough(state === 'clickThrough')`. Overlay mode: clicking the dog → `dog.setPose('sit')` (proves the click arrived).
+- [x] **Step 2: Verify by hand** — Where: Windows demo laptop. Steps: `npm run dev`; click on the desktop/Notepad right next to the dog, then on the dog.
   Expected: clicks next to the dog reach the app underneath; clicking the dog makes it sit; the dog's head follows the cursor across the whole screen even over other apps; no flicker of the cursor when moving across the dog's edge.
-- [ ] **Step 3: Commit** — `git add app/src/main/ipc-main.ts app/src/main/index.ts app/src/preload/index.ts app/src/preload/index.d.ts app/src/renderer/main.ts && git commit -m "feat: typed IPC bridge; overlay is clickable only on the dog"`
+  **Result (2026-10-04):** all confirmed — clicking the dog's head makes it sit, clicking next to it passes through to the app underneath, head tracks the cursor everywhere, no flicker at the edge. (Clicking again doesn't make it stand — expected, this checkpoint only wires `sit` to prove the click arrives; richer interaction is P2 behaviour work, not this task.)
+- [x] **Step 3: Commit** — `git add app/src/main/ipc-main.ts app/src/main/index.ts app/src/preload/index.ts app/src/preload/index.d.ts app/src/renderer/main.ts && git commit -m "feat: typed IPC bridge; overlay is clickable only on the dog"` → `008d350`
 
 ---
 
