@@ -1,7 +1,8 @@
 // App host (CP0): renders our dog (the Aussie, via createDog) in a normal window. Click to make it run there;
 // it watches the cursor. Lane A turns this into the transparent overlay in P1.
-import { APP_NAME, FRAME_BUDGET_MS } from '@shared/app-info'
 import { createDog } from './dog/create-dog'
+import { FrameStats } from './host/frame-stats'
+import { Hud } from './host/hud'
 import { createRenderContext } from './host/scene'
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement
@@ -43,15 +44,21 @@ async function start(): Promise<void> {
     })()
   }
 
+  const stats = new FrameStats()
+  const hud = new Hud(status)
+  hud.set('world', 'world: -')
+  hud.set('activity', 'activity: -')
+
   let last = performance.now()
   const frame = (now: number): void => {
-    const dt = now - last
+    const frameMs = now - last
     last = now
-    dog.update(dt)
+    const workStart = performance.now()
+    dog.update(frameMs)
     ctx.renderer.render(ctx.scene, ctx.camera)
-    status.textContent = overlay
-      ? `${APP_NAME} · ${dt.toFixed(1)} ms (budget ${FRAME_BUDGET_MS.toFixed(1)} ms)`
-      : `${APP_NAME} · ${dt.toFixed(1)} ms (budget ${FRAME_BUDGET_MS.toFixed(1)} ms) · click to call the dog`
+    const workMs = performance.now() - workStart
+    stats.add(frameMs, workMs)
+    hud.frame(stats, now)
     requestAnimationFrame(frame)
   }
   requestAnimationFrame(frame)
