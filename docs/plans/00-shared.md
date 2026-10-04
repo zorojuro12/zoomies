@@ -158,7 +158,7 @@ export type InputEvent =
 
 ---
 
-### 3.9 `landmarks.ts` — Abel produces, Daniel consumes
+### 3.9 `landmarks.ts` — optional now (only for the P3 silhouette optimiser)
 `assets/views/landmarks.json`: per view (`front` = the photo, `side_sit`, `side_stand`, `back`), a map of landmark name → `[x, y]` pixel coordinates (origin top-left), plus `image_size` per view. Only points visible in that view. The 28 names are `LANDMARK_NAMES` in `app/src/shared/landmarks.ts`.
 
 ### 3.10 `assets.ts` — how the app loads files from `assets/`
@@ -171,7 +171,7 @@ The repo-root `assets/` folder is the renderer's public directory (`app/electron
 | Provider → Consumer | What | Needed by |
 |---|---|---|
 | Ansh → all | Scaffold + contracts + stubs merged | Start of P1 |
-| Abel → Daniel | `side_sit`, `side_stand` and `back` views (`assets/views/`) and `landmarks.json` | Early P1 (the fitting work starts on it) |
+| Abel → Daniel | `side_sit`, `side_stand` and `back` views (`assets/views/`) — only to colour the unseen sides (Daniel's fitting now uses a Gemini dog spec, not landmarks) | By end of P2 |
 | Ansh → Daniel | Overlay window + render loop hosting `DogView` | Mid P1 |
 | Daniel → Ansh | Real `DogController` + `DogView` replacing the placeholder (fitted body, poses, walk) | End P2 (placeholder used until then) |
 | Daniel → Abel | Pose & shape editor in the app | End P2 (Abel tunes likeness in P3) |
@@ -239,7 +239,7 @@ If a dependency is late, the consumer keeps using the stub — nobody waits idle
 | Risk | Mitigation |
 |---|---|
 | Contracts wrong once real code exists | Change via a tiny PR + tell the others; stubs keep everyone moving |
-| Gemini views late or inconsistent → Daniel blocked | Daniel starts from the original photo + hand-placed landmarks; swaps in views when ready |
+| Gemini dog spec off (wrong ratios/colours) | Daniel's median-of-3, clamping, colour snap to the photo, default Aussie template, editor sliders |
 | Integration only happens at the end | Checkpoint ritual every phase; Windows run every time |
 | One lane overloaded (Lane A is heaviest) | Hand L2/G2/G3 to Daniel once the dog is stable |
 
