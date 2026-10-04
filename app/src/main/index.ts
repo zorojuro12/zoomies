@@ -2,6 +2,8 @@ import { app, shell, BrowserWindow, Tray, Menu } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { sendTo, registerIpc } from './ipc-main'
+import { createSerialDriver } from './hardware/serial-driver'
+import { startSerialService } from './hardware/serial-service'
 import { createOsLayer } from './os/create-os-layer'
 import { WindowsOsLayer } from './os/windows-os-layer'
 import { createAppWindow, isOverlayMode } from './overlay-window'
@@ -38,7 +40,16 @@ function createMainWindow(): void {
   })
 
   const os = createOsLayer(overlay)
-  registerIpc(os)
+  // The controller (Arduino): its input and connection status go to the window; the dog's buzzer
+  // requests come back. Does nothing, quietly, when no board or no serialport module is there.
+  const serial = startSerialService({
+    driver: createSerialDriver((m) => console.log(`[serial] ${m}`)),
+    env: process.env,
+    sendInput: (e) => sendTo(win, 'input:event', e),
+    sendStatus: (s) => sendTo(win, 'serial:status', s)
+  })
+  app.on('will-quit', () => serial.stop())
+  registerIpc(os, serial.buzz, () => serial.reader?.status ?? { connected: false, port: null })
   if (os instanceof WindowsOsLayer) {
     os.start(
       win,

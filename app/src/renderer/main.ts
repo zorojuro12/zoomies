@@ -4,6 +4,7 @@ import type { Rect } from '@shared/geometry'
 import type { ActivityEvent, WindowRect } from '@shared/os'
 import { createAudioPlayer } from './audio'
 import { Behaviour } from './behaviour/behaviour'
+import { BuzzerCues } from './behaviour/buzzer-cues'
 import { SoundCues } from './behaviour/cues'
 import { FrameGovernor } from './behaviour/fps'
 import type { FpsTier } from './behaviour/fps'
@@ -11,7 +12,7 @@ import { timingFor } from './behaviour/timing'
 import { createDog } from './dog/create-dog'
 import { ClickThroughGate } from './host/click-through'
 import { FrameStats } from './host/frame-stats'
-import { Hud } from './host/hud'
+import { Hud, controllerHudText } from './host/hud'
 import { createRenderContext } from './host/scene'
 import { createBall, stepBall } from './world/ball'
 import type { Ball } from './world/ball'
@@ -51,6 +52,18 @@ async function start(): Promise<void> {
   const hud = new Hud(status)
   // The dog's personality (needs, reactions, fetch, adaptive frame rate): created once the dog exists.
   let behaviour: Behaviour | null = null
+  // The controller (Arduino, via the main process): its events drive the dog like the mouse does,
+  // and the buzzer only gets requests while a board is actually connected.
+  let buzzer: BuzzerCues | null = null
+  let controllerConnected = false
+  const onSerialStatus = (s: { connected: boolean; port: string | null }): void => {
+    controllerConnected = s.connected
+    buzzer?.setEnabled(s.connected)
+    hud.set('controller', controllerHudText(s))
+  }
+  window.zoomies.onSerialStatus(onSerialStatus)
+  window.zoomies.onInput((e) => behaviour?.handleInput(e))
+  void window.zoomies.getSerialStatus().then(onSerialStatus)
   const world = new World()
   const worldView = new WorldView(ctx.scene)
   worldView.setDebug(debug)
@@ -135,6 +148,9 @@ async function start(): Promise<void> {
       muted
     })
     brain.onEvent((e) => cues?.handle(e))
+    buzzer = new BuzzerCues((p) => window.zoomies.buzz(p))
+    buzzer.setEnabled(controllerConnected)
+    brain.onEvent((e) => buzzer?.handle(e))
   }
   const governor = new FrameGovernor()
   // What the world draws while the dog has the ball in its mouth (nothing: radius 0).
@@ -192,6 +208,8 @@ async function start(): Promise<void> {
       if (dog.hitTest(e.clientX, e.clientY))
         behaviour?.handleInput({ kind: 'pet', source: 'mouse' })
     })
+    // Double-click = call (the mouse twin of the controller's button tap).
+    window.addEventListener('dblclick', () => behaviour?.handleInput({ kind: 'call' }))
   } else {
     window.addEventListener('mousemove', (e) => dog.lookAt({ x: e.clientX, y: e.clientY }))
     if (!overlay) {
@@ -252,6 +270,7 @@ async function start(): Promise<void> {
     const workStart = performance.now()
     stepBall(ball, world, frameMs)
     behaviour?.update(frameMs)
+    buzzer?.update(frameMs)
     cues?.update(frameMs)
     worldView.setBall(behaviour?.fetch.carrying ? hiddenBall : ball)
     if (!behaviour && !ball.resting) dog.lookAt({ x: ball.x, y: ball.y })

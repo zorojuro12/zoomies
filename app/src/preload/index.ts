@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { Rect } from '@shared/geometry'
 import type { ActivityEvent, WindowRect } from '@shared/os'
+import type { InputEvent } from '@shared/input'
+import type { BuzzerPreset } from '@shared/serial'
 
 // Custom APIs for renderer
 const api = {}
@@ -25,6 +27,21 @@ const zoomies = {
     const listener = (_e: unknown, ev: ActivityEvent): void => cb(ev)
     ipcRenderer.on('os:activity', listener)
     return () => ipcRenderer.removeListener('os:activity', listener)
+  },
+  onInput: (cb: (e: InputEvent) => void): (() => void) => {
+    const listener = (_e: unknown, ev: InputEvent): void => cb(ev)
+    ipcRenderer.on('input:event', listener)
+    return () => ipcRenderer.removeListener('input:event', listener)
+  },
+  onSerialStatus: (cb: (s: { connected: boolean; port: string | null }) => void): (() => void) => {
+    const listener = (_e: unknown, s: { connected: boolean; port: string | null }): void => cb(s)
+    ipcRenderer.on('serial:status', listener)
+    return () => ipcRenderer.removeListener('serial:status', listener)
+  },
+  getSerialStatus: (): Promise<{ connected: boolean; port: string | null }> =>
+    ipcRenderer.invoke('serial:status'),
+  buzz: (preset: BuzzerPreset): void => {
+    ipcRenderer.send('serial:buzzer', { preset })
   },
   setClickThrough: (enabled: boolean): void => {
     ipcRenderer.send('os:setClickThrough', enabled)
