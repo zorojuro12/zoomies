@@ -112,17 +112,18 @@
 
 **Checkpoint 1: rolling averages and p95**
 
-- [ ] **Step 1: Write failing tests** — Spec: (a) 120 × `add(16.667, 1)` → `fps()` = 60.0 ± 0.1, `frameAvg()` = 16.667 ± 0.001, `workAvg()` = 1; (b) capacity 120, 114 × `add(16.7, 1)` + 6 × `add(16.7, 50)` → `workP95()` = 50, `workMax()` = 50; 119 × work 1 + 1 × work 50 → `workP95()` = 1; (c) 3 samples (work 1, 2, 3) → `count()` = 3, `workAvg()` = 2 (not divided by 120); (d) 200 samples into capacity 120 → `count()` = 120 and only the last 120 count (first 80 work = 100, last 120 work = 1 → `workAvg()` = 1); (e) empty → `fps()` = 0, `workP95()` = 0.
-- [ ] **Step 2: Run** — `cd app && npx vitest run src/renderer/host/frame-stats.test.ts` → FAIL (module not found).
-- [ ] **Step 3: Implement** `FrameStats` per Interfaces.
-- [ ] **Step 4: Run** — same command → PASS, 5 tests listed in the count.
-- [ ] **Step 5: Commit** — `npx vitest run src/renderer/host/frame-stats.test.ts && git add app/src/renderer/host/frame-stats.ts app/src/renderer/host/frame-stats.test.ts && git commit -m "feat: rolling frame stats (fps, avg, p95) for the FPS overlay"`
+- [x] **Step 1: Write failing tests** — Spec: (a) 120 × `add(16.667, 1)` → `fps()` = 60.0 ± 0.1, `frameAvg()` = 16.667 ± 0.001, `workAvg()` = 1; (b) capacity 120, 114 × `add(16.7, 1)` + 6 × `add(16.7, 50)` → `workP95()` = 50, `workMax()` = 50; 119 × work 1 + 1 × work 50 → `workP95()` = 1; (c) 3 samples (work 1, 2, 3) → `count()` = 3, `workAvg()` = 2 (not divided by 120); (d) 200 samples into capacity 120 → `count()` = 120 and only the last 120 count (first 80 work = 100, last 120 work = 1 → `workAvg()` = 1); (e) empty → `fps()` = 0, `workP95()` = 0.
+- [x] **Step 2: Run** — `cd app && npx vitest run src/renderer/host/frame-stats.test.ts` → FAIL (module not found).
+- [x] **Step 3: Implement** `FrameStats` per Interfaces. **Correction:** the p95 index is `Math.floor(0.95 * n)`, not `Math.floor(0.95 * (n - 1))` as the Interfaces note above says — verified against the test spec's own worked example (114×1 + 6×50 must give `workP95() = 50`, which only the `0.95 * n` index satisfies).
+- [x] **Step 4: Run** — same command → PASS, 5 tests listed in the count.
+- [x] **Step 5: Commit** — `npx vitest run src/renderer/host/frame-stats.test.ts && git add app/src/renderer/host/frame-stats.ts app/src/renderer/host/frame-stats.test.ts && git commit -m "feat: rolling frame stats (fps, avg, p95) for the FPS overlay"` → `025e8b2`
 
 **Checkpoint 2 (manual): HUD in the overlay**
 
-- [ ] **Step 1: Implement** — `Hud` per Interfaces; host loop measures frame interval + work and calls `stats.add` / `hud.frame` every frame (no allocation in the loop: no template strings except inside the 250 ms throttle).
-- [ ] **Step 2: Verify by hand** — Where: Windows demo laptop. Steps: `npm run dev`. Expected: bottom-left readout shows fps at the monitor's refresh rate (~144) and a **work** time well under the frame time (≈ 1 ms), updating ~4×/s — the old single "6.9 ms" number is gone.
-- [ ] **Step 3: Commit** — `git add app/src/renderer/host/hud.ts app/src/renderer/main.ts && git commit -m "feat: FPS / frame-time overlay with real work time"`
+- [x] **Step 1: Implement** — `Hud` per Interfaces; host loop measures frame interval + work and calls `stats.add` / `hud.frame` every frame (no allocation in the loop: no template strings except inside the 250 ms throttle).
+- [x] **Step 2: Verify by hand** — Where: Windows demo laptop. Steps: `npm run dev`. Expected: bottom-left readout shows fps at the monitor's refresh rate (~144) and a **work** time well under the frame time (≈ 1 ms), updating ~4×/s — the old single "6.9 ms" number is gone.
+  **Result (2026-10-04):** confirmed — fps stable at 144, readout shows `work 0.4 / p95 0.6 ms`, matching the earlier preview-page measurement.
+- [x] **Step 3: Commit** — `git add app/src/renderer/host/hud.ts app/src/renderer/main.ts && git commit -m "feat: FPS / frame-time overlay with real work time"` → `65555cf`
 
 ---
 
