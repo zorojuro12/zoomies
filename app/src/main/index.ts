@@ -2,6 +2,11 @@ import { app, shell, BrowserWindow, Tray, Menu } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { sendTo, registerIpc } from './ipc-main'
+import { loadDotenvFiles } from './services/dotenv'
+import { transcribe } from './services/elevenlabs-stt'
+import { interpretCommand } from './services/gemini-command'
+import { createSerialDriver } from './hardware/serial-driver'
+import { startSerialService } from './hardware/serial-service'
 import { createOsLayer } from './os/create-os-layer'
 import { WindowsOsLayer } from './os/windows-os-layer'
 import { createAppWindow, isOverlayMode } from './overlay-window'
@@ -22,6 +27,9 @@ async function logActiveGpu(): Promise<void> {
   }
 }
 
+// Dev: pick up the API keys from the gitignored .env (never overrides real environment variables).
+loadDotenvFiles(process.env)
+
 function createTray(): void {
   tray = new Tray(icon)
   tray.setToolTip('Zoomies')
@@ -32,13 +40,43 @@ function createMainWindow(): void {
   const overlay = isOverlayMode()
   const win = createAppWindow({ overlay, debug: process.env.ZOOMIES_DEBUG === '1' })
 
+  // ZOOMIES_LOG_RENDERER=1: print the page's console in this terminal (dev debugging).
+  if (process.env.ZOOMIES_LOG_RENDERER === '1')
+    win.webContents.on('console-message', (e) => console.log(`[page] ${e.message}`))
+
   win.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
+  // The microphone is the only permission the window may ask for (push-to-talk, held-button only).
+  win.webContents.session.setPermissionRequestHandler((_wc, permission, done) =>
+    done(permission === 'media')
+  )
   const os = createOsLayer(overlay)
-  registerIpc(os)
+  // The controller (Arduino): its input and connection status go to the window; the dog's buzzer
+  // requests come back. Does nothing, quietly, when no board or no serialport module is there.
+  const serial = startSerialService({
+    driver: createSerialDriver((m) => console.log(`[serial] ${m}`)),
+    env: process.env,
+    sendInput: (e) => sendTo(win, 'input:event', e),
+    sendStatus: (s) => sendTo(win, 'serial:status', s)
+  })
+  app.on('will-quit', () => serial.stop())
+  registerIpc(
+    os,
+    serial.buzz,
+    () => serial.reader?.status ?? { connected: false, port: null },
+    // free text -> one of the dog's commands (Gemini function calling; 'error' = use the word list)
+    (text) =>
+      interpretCommand(text, {
+        apiKey: process.env.GEMINI_API_KEY,
+        model: process.env.GEMINI_MODEL || undefined
+      }),
+    // a push-to-talk recording -> the words (ElevenLabs); '' = nothing heard or it failed
+    async (audio, mime) =>
+      (await transcribe(audio, mime, { apiKey: process.env.ELEVENLABS_API_KEY })) ?? ''
+  )
   if (os instanceof WindowsOsLayer) {
     os.start(
       win,

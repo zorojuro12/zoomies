@@ -66,8 +66,20 @@ describe('the cue table', () => {
     ['it sits down idle', act('wentIdle'), 'sigh'],
     ['a backspace head tilt', react('backspace'), 'whine'],
     ['you shake the mouse', react('shake'), 'yip_excited'],
-    ['you pet it', { kind: 'pet' }, 'yip_excited']
+    ['you pet it', { kind: 'pet', source: 'mouse' }, 'yip_excited'],
+    ['you call it (the controller button)', { kind: 'call' }, 'yip_excited'],
+    ['you say speak', { kind: 'command', name: 'speak' }, 'bark_happy'],
+    ['you say good boy', { kind: 'command', name: 'good_boy' }, 'yip_excited']
   ]
+  // the other commands make no sound of their own (come already yips through 'call', fetch barks through
+  // the fetch cues), so nothing doubles up
+  for (const name of ['sit', 'lie_down', 'come', 'fetch', 'play_trick', null] as const) {
+    it(`command ${String(name)}: silent`, () => {
+      const { c, p } = mk()
+      c.handle({ kind: 'command', name })
+      expect(p.names()).toEqual([])
+    })
+  }
   for (const [name, event, sound] of cases) {
     it(`${name}: ${sound}`, () => {
       const { c, p } = mk()
@@ -337,7 +349,7 @@ describe('odd situations', () => {
       act('returned'),
       react('greet'),
       react('sleep', 'end'),
-      { kind: 'pet' },
+      { kind: 'pet', source: 'mouse' },
       { kind: 'bounce', x: 300, strength: 0.4 }
     ]
     for (let i = 0; i < 5000; i++) {

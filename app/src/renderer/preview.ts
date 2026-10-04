@@ -12,7 +12,10 @@ import { normalizeSpec } from './dog/spec/dog-spec'
 import { mountSpecEditor } from './ui/editor/spec-editor'
 import { createRenderContext, loadJson } from './host/scene'
 import { createAudioPlayer } from './audio'
+import { PetHand } from './dog/hand/hand-view'
+import { handAnchor } from './dog/hand/head-anchor'
 import { Behaviour } from './behaviour/behaviour'
+import { BuzzerCues } from './behaviour/buzzer-cues'
 import { SoundCues } from './behaviour/cues'
 import { Fetch } from './behaviour/fetch'
 import { FrameGovernor } from './behaviour/fps'
@@ -148,6 +151,9 @@ async function start(): Promise<void> {
   const DOG_HOME = 0.85
   const BALL_HOME = 0.6
   let fetchState = ''
+  // the last buzzer request (the controller's buzzer), shown in the status line for a moment
+  let buzzText = ''
+  let buzzUntil = 0
   if (params.get('fetch') === '1' || behaviourDemo) {
     const world = new World()
     const workArea = { x: 0, y: 0, w: window.innerWidth, h: groundY() }
@@ -205,6 +211,23 @@ async function start(): Promise<void> {
         muted: params.get('mute') === '1'
       })
       brain.onEvent((e) => cues?.handle(e))
+    }
+    const buzzer = new BuzzerCues((p) => {
+      buzzText = p
+      buzzUntil = performance.now() + 1500
+    })
+    behaviour?.onEvent((e) => buzzer.handle(e))
+    // the pet hand: a white glove strokes the dog's head whenever it is petted (touch or mouse)
+    const hand = new PetHand(ctx.scene)
+    const headPoint = { x: 0, y: 0 }
+    behaviour?.onEvent((e) => {
+      if (e.kind === 'pet') hand.play('body')
+    })
+    if (behaviour) {
+      window.addEventListener('click', (e) => {
+        if (dog.hitTest(e.clientX, e.clientY))
+          behaviour.handleInput({ kind: 'pet', source: 'mouse' })
+      })
     }
     const fetch = behaviour ? behaviour.fetch : new Fetch({ dog, ball, world, groundY })
     fetch.onNote((n) => console.log('[fetch]', n))
@@ -348,7 +371,22 @@ async function start(): Promise<void> {
       button('tire out', () => {
         behaviour.needs.energy = 0.1
       })
+      button('pet (touch sensor)', () => behaviour.handleInput({ kind: 'pet', source: 'touch' }))
       button('pet', () => behaviour.handleInput({ kind: 'pet', source: 'mouse' }))
+      // the controller, faked: the joystick pulled back, the button tapped / held, a double-click = call
+      button('joystick aim 2 s', () => {
+        let n = 0
+        const id = setInterval(() => {
+          behaviour.handleInput({ kind: 'aim', angle: -0.8, power: 0.7 })
+          if (++n >= 60) clearInterval(id)
+        }, 33)
+      })
+      button('call (button tap)', () => behaviour.handleInput({ kind: 'call' }))
+      button('push-to-talk 3 s', () => {
+        behaviour.handleInput({ kind: 'pushToTalk', state: 'start' })
+        setTimeout(() => behaviour.handleInput({ kind: 'pushToTalk', state: 'stop' }), 3000)
+      })
+      window.addEventListener('dblclick', () => behaviour.handleInput({ kind: 'call' }))
       button('mute on/off', () => cues?.setMuted(!cues.muted))
       button('late night on/off', () => {
         hourOverride = hourOverride < 0 ? 23 : -1
@@ -359,9 +397,12 @@ async function start(): Promise<void> {
       if (behaviour) {
         behaviour.update(dtMs)
         cues?.update(dtMs)
+        buzzer.update(dtMs)
       } else fetch.update(dtMs)
       worldView.setBall(fetch.carrying ? hiddenBall : ball) // hidden while it is in the dog's mouth
+      if (hand.playing) hand.update(dtMs, headPoint, handAnchor(dog, 'body', headPoint))
       fetchState = behaviour ? behaviour.describe() : `fetch ${fetch.state}`
+      if (performance.now() < buzzUntil) fetchState += ` · buzzer: ${buzzText}`
     }
   }
 

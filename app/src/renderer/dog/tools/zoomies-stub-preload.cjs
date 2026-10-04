@@ -5,6 +5,11 @@
 const { contextBridge } = require('electron')
 
 const activity = []
+const inputs = []
+const statuses = []
+const buzzed = []
+let interpretAnswer = 'error'
+let transcribeAnswer = ''
 contextBridge.exposeInMainWorld('zoomies', {
   getWindows: () => Promise.resolve([]),
   getWorkArea: () =>
@@ -15,9 +20,36 @@ contextBridge.exposeInMainWorld('zoomies', {
     activity.push(cb)
     return () => {}
   },
+  onInput: (cb) => {
+    inputs.push(cb)
+    return () => {}
+  },
+  onSerialStatus: (cb) => {
+    statuses.push(cb)
+    return () => {}
+  },
+  getSerialStatus: () => Promise.resolve({ connected: false, port: null }),
+  transcribe: () => Promise.resolve(transcribeAnswer),
+  interpret: () => Promise.resolve(interpretAnswer),
+  buzz: (p) => {
+    buzzed.push(p)
+  },
   setClickThrough: () => {}
 })
 contextBridge.exposeInMainWorld('__stub', {
+  buzzed: () => buzzed,
+  heard: (t) => {
+    transcribeAnswer = t
+  },
+  answer: (a) => {
+    interpretAnswer = a
+  },
+  input: (e) => {
+    for (const cb of inputs) cb(e)
+  },
+  status: (s) => {
+    for (const cb of statuses) cb(s)
+  },
   emit: (e) => {
     for (const cb of activity) cb(e)
   }
