@@ -195,7 +195,7 @@ describe('stepBall: spawned or landed inside a big window', () => {
       return seed / 4294967296
     }
     for (let trial = 0; trial < 200; trial++) {
-      const solids = []
+      const solids: { x: number; y: number; w: number; h: number }[] = []
       const n = 1 + Math.floor(rand() * 4)
       for (let k = 0; k < n; k++) {
         const w = 100 + rand() * 1700

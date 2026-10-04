@@ -131,7 +131,15 @@ async function start(): Promise<void> {
     const frameMs = now - last
     last = now
     if (diagFrameCount < 3 || diagFrameCount % 120 === 0) {
-      console.log('[diag] frame', diagFrameCount, 'ball', ball.x.toFixed(1), ball.y.toFixed(1), 'resting', ball.resting)
+      console.log(
+        '[diag] frame',
+        diagFrameCount,
+        'ball',
+        ball.x.toFixed(1),
+        ball.y.toFixed(1),
+        'resting',
+        ball.resting
+      )
     }
     diagFrameCount++
     const workStart = performance.now()
