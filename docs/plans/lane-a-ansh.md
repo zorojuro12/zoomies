@@ -71,6 +71,7 @@
 
 ## P3 — Shoulds
 - [ ] **Serial (with Abel):** `serialport`, auto-detect the port by `HELLO:zoomies:1`, parse §3.7, reconnect on unplug; map to `InputEvent`s — joystick pull-back = `aim`, release past threshold or button = `launch`, touch = `pet`, button tap = `call`, button hold = `pushToTalk`. Buzzer: `S:squeak` on catch, `S:chirp` per bounce.
+  **Note (2026-10-04, from Abel's `c/controller` journal):** the merged sketch sends `HELLO:zoomies:1` every 2s, repeating forever (not just once on boot/connect) — the reader must treat a repeat as a no-op, not re-run port-detect/reconnect logic each time it arrives.
 - [ ] **Bounce prediction + mid-air catch:** simulate the ball forward against the world SDF → landing point; if the path crosses a reachable point, `jumpTo` an intercept and catch.
 - [ ] **Window terrain:** platforms from window top edges + taskbar; route with walks + `jumpTo` arcs; ride a dragged window (follow its delta, jump off on large acceleration); fall + stumble when the window under the dog closes; **peek from behind** (dog behind a higher-z window is masked by that window's rect, peeks at the edge).
 - [ ] **ElevenLabs L2:** push-to-talk records mic → STT → `command` event; ears perk on press; clickable command buttons as fallback.
