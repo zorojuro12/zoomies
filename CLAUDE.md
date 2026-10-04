@@ -87,6 +87,7 @@ Pipeline (`pipeline/`): Python 3.11+ venv, `pip install -r requirements.txt`, `p
   branches others may have pulled.
 - Commits: `type: description` (feat, fix, refactor, docs, test, chore, perf).
   `git add` exact paths, not `-A`.
+- **Plans have one owner:** only edit `docs/plans/lane-<you>-*.md` and your own phase plans. On a merge conflict in your own plan, keep your branch's version (after checking what `dev` changed); in shared files, combine both sides.
 - Only Ansh promotes `dev` → `main`, at checkpoints, and tags it.
 
 ## Testing (hackathon policy)
