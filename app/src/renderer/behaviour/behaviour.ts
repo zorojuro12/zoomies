@@ -64,7 +64,8 @@ const COMMAND_HOLD_MS: Record<CommandName, number> = {
   fetch: 0,
   speak: 1500,
   good_boy: 2500,
-  play_trick: 3000
+  play_trick: 3000,
+  jump: 1500
 }
 /** A push-to-talk with no stop message (a loose wire) gives up after this long. */
 const TALK_MAX_MS = 10000
@@ -482,6 +483,13 @@ export class Behaviour {
       case 'speak':
         this.extras.setMood('happy', 0.8)
         break
+      case 'jump': {
+        // a hop on the spot: up and back down at the same place
+        const at = this.dog.getState()
+        void this.dog.jumpTo(at.x, at.y, { apexPx: 70 })
+        this.extras.setMood('happy', 0.8)
+        break
+      }
       case 'play_trick':
         void this.extras.playIdle(IDLE_NAMES[this.trickIndex++ % IDLE_NAMES.length])
         break

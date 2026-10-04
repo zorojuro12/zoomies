@@ -8,7 +8,8 @@ export const COMMAND_NAMES = [
   'fetch',
   'speak',
   'good_boy',
-  'play_trick'
+  'play_trick',
+  'jump'
 ] as const
 export type CommandName = (typeof COMMAND_NAMES)[number]
 
@@ -20,7 +21,8 @@ export const COMMAND_LABELS: Record<CommandName, string> = {
   fetch: 'Fetch',
   speak: 'Speak',
   good_boy: 'Good boy',
-  play_trick: 'Trick'
+  play_trick: 'Trick',
+  jump: 'Jump'
 }
 
 // Whole words only. The first word that means a command wins, so "sit down" is sit (not lie down).
@@ -38,6 +40,9 @@ const WORDS: Record<string, CommandName> = {
   woof: 'speak',
   talk: 'speak',
   good: 'good_boy',
+  jump: 'jump',
+  hop: 'jump',
+  leap: 'jump',
   trick: 'play_trick',
   tricks: 'play_trick'
 }

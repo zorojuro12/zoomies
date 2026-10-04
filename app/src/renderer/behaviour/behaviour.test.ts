@@ -892,6 +892,17 @@ describe('commands (typed, spoken, or picked by the AI)', () => {
     expect(h.b.fetch.active).toBe(false)
   })
 
+  it('jump: hops on the spot (up and down at the same place), then stands', () => {
+    const h = mk()
+    const x = h.dog.x
+    say(h, 'jump')
+    run(h, 0.2)
+    expect(h.dog.log).toContain(`jumpTo ${Math.round(x)} ${GROUND} 70`)
+    activeFor(h, 3)
+    expect(h.dog.pose).toBe('stand')
+    expect(h.b.arbiter.owner).toBe('none')
+  })
+
   it('speak: a command event for the bark, and the dog stays standing', () => {
     const h = mk()
     const ev = events(h)
@@ -969,7 +980,16 @@ describe('commands (typed, spoken, or picked by the AI)', () => {
   })
 
   it('the names Gemini sends work too', () => {
-    for (const n of ['sit', 'lie_down', 'come', 'fetch', 'speak', 'good_boy', 'play_trick']) {
+    for (const n of [
+      'sit',
+      'lie_down',
+      'come',
+      'fetch',
+      'speak',
+      'good_boy',
+      'play_trick',
+      'jump'
+    ]) {
       const h = mk()
       const ev = events(h)
       say(h, n)

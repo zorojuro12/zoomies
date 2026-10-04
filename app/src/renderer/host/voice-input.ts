@@ -100,7 +100,10 @@ export class VoiceInput {
 
   private async finish(s: Session): Promise<void> {
     s.stream.stop() // mic off
-    if (Date.now() - s.startedAt < VOICE.minMs) return // a tap, not speech
+    if (Date.now() - s.startedAt < VOICE.minMs) {
+      this.deps.onError('held too briefly: hold the button while you speak')
+      return // a tap, not speech
+    }
     try {
       const parts = await Promise.all(s.chunks.map((c) => c.arrayBuffer()))
       const total = parts.reduce((n, p) => n + p.byteLength, 0)

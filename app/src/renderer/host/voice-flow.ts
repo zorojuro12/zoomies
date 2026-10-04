@@ -6,7 +6,8 @@ export async function handleClip(
   mime: string,
   transcribe: (bytes: Uint8Array, mime: string) => Promise<string | null>,
   route: (text: string) => void,
-  send: (text: string) => void
+  send: (text: string) => void,
+  report: (message: string) => void = () => undefined
 ): Promise<void> {
   let heard: string | null
   try {
@@ -14,6 +15,11 @@ export async function handleClip(
   } catch {
     heard = null
   }
-  if (heard && heard.trim()) route(heard)
-  else send('')
+  if (heard && heard.trim()) {
+    report(`heard "${heard.trim()}"`)
+    route(heard)
+  } else {
+    report(heard === null ? 'could not transcribe (offline or no key?)' : 'heard nothing')
+    send('')
+  }
 }

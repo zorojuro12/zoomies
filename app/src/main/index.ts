@@ -40,6 +40,10 @@ function createMainWindow(): void {
   const overlay = isOverlayMode()
   const win = createAppWindow({ overlay, debug: process.env.ZOOMIES_DEBUG === '1' })
 
+  // ZOOMIES_LOG_RENDERER=1: print the page's console in this terminal (dev debugging).
+  if (process.env.ZOOMIES_LOG_RENDERER === '1')
+    win.webContents.on('console-message', (e) => console.log(`[page] ${e.message}`))
+
   win.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }

@@ -7,10 +7,9 @@ import { interpretCommand, type FetchLike } from './gemini-command'
 const KEY = 'test-key-123'
 
 function reply(action: unknown): unknown {
+  const name = action === 'none' ? 'no_action' : action
   return {
-    candidates: [
-      { content: { parts: [{ functionCall: { name: 'dog_action', args: { action } } }] } }
-    ]
+    candidates: [{ content: { parts: [{ functionCall: { name, args: {} } }] } }]
   }
 }
 function okFetch(body: unknown, calls: { url: string; init: RequestInit }[] = []): FetchLike {
@@ -21,7 +20,7 @@ function okFetch(body: unknown, calls: { url: string; init: RequestInit }[] = []
 }
 
 describe('what comes back', () => {
-  for (const a of ['sit', 'lie_down', 'come', 'fetch', 'speak', 'good_boy', 'play_trick']) {
+  for (const a of ['sit', 'lie_down', 'come', 'fetch', 'speak', 'good_boy', 'play_trick', 'jump']) {
     it(`tool call ${a} -> ${a}`, async () => {
       expect(await interpretCommand('whatever', { apiKey: KEY, fetch: okFetch(reply(a)) })).toBe(a)
     })
@@ -31,11 +30,17 @@ describe('what comes back', () => {
       await interpretCommand('capital of france', { apiKey: KEY, fetch: okFetch(reply('none')) })
     ).toBe('none')
   })
-  it('an action that is not in the list -> error (never trust the model)', async () => {
+  it('an invented action name -> error (never trust the model)', async () => {
     expect(await interpretCommand('x', { apiKey: KEY, fetch: okFetch(reply('dance')) })).toBe(
       'error'
     )
     expect(await interpretCommand('x', { apiKey: KEY, fetch: okFetch(reply(42)) })).toBe('error')
+  })
+  it('a function name we never offered -> error', async () => {
+    const body = {
+      candidates: [{ content: { parts: [{ functionCall: { name: 'dance', args: {} } }] } }]
+    }
+    expect(await interpretCommand('x', { apiKey: KEY, fetch: okFetch(body) })).toBe('error')
   })
   it('a plain text answer with no tool call -> error', async () => {
     const body = { candidates: [{ content: { parts: [{ text: 'sure!' }] } }] }
@@ -51,10 +56,7 @@ describe('what comes back', () => {
       candidates: [
         {
           content: {
-            parts: [
-              { text: 'hmm' },
-              { functionCall: { name: 'dog_action', args: { action: 'sit' } } }
-            ]
+            parts: [{ text: 'hmm' }, { functionCall: { name: 'sit', args: {} } }]
           }
         }
       ]
@@ -125,7 +127,7 @@ describe('what is sent', () => {
     expect(String(calls[0].init.body).includes(KEY)).toBe(false)
     expect((calls[0].init.headers as Record<string, string>)['x-goog-api-key']).toBe(KEY)
   })
-  it('forces the tool call, offers exactly the seven commands plus none, and uses the configured model', async () => {
+  it('forces a tool call, uses the configured model, and offers one described function per command plus no_action', async () => {
     const calls: { url: string; init: RequestInit }[] = []
     await interpretCommand('sit', {
       apiKey: KEY,
@@ -134,9 +136,8 @@ describe('what is sent', () => {
     })
     expect(calls[0].url).toContain('/models/gemini-test:generateContent')
     const body = JSON.parse(String(calls[0].init.body))
-    expect(body.toolConfig.functionCallingConfig.mode).toBe('ANY')
-    const decl = body.tools[0].functionDeclarations[0]
-    expect(decl.parameters.properties.action.enum).toEqual([
+    const decls = body.tools[0].functionDeclarations as { name: string; description: string }[]
+    expect(decls.map((d) => d.name)).toEqual([
       'sit',
       'lie_down',
       'come',
@@ -144,9 +145,40 @@ describe('what is sent', () => {
       'speak',
       'good_boy',
       'play_trick',
-      'none'
+      'jump',
+      'no_action'
     ])
+    for (const d of decls) expect(d.description.length).toBeGreaterThan(30) // a real description each
+    expect(body.toolConfig.functionCallingConfig.mode).toBe('ANY')
+    expect(body.toolConfig.functionCallingConfig.allowedFunctionNames).toEqual(
+      decls.map((d) => d.name)
+    )
     expect(body.contents[0].parts[0].text).toBe('sit')
+  })
+  it('each description says what the action is and when to use it (the words that should pick it)', async () => {
+    const calls: { url: string; init: RequestInit }[] = []
+    await interpretCommand('x', { apiKey: KEY, fetch: okFetch(reply('sit'), calls) })
+    const decls = JSON.parse(String(calls[0].init.body)).tools[0].functionDeclarations as {
+      name: string
+      description: string
+    }[]
+    const d = (n: string): string => decls.find((x) => x.name === n)!.description.toLowerCase()
+    expect(d('jump')).toMatch(/jump up|hop|leap/)
+    expect(d('sit')).toMatch(/sit/)
+    expect(d('lie_down')).toMatch(/lie|lay/)
+    expect(d('come')).toMatch(/come/)
+    expect(d('fetch')).toMatch(/ball/)
+    expect(d('speak')).toMatch(/bark/)
+    expect(d('good_boy')).toMatch(/praise|good boy/)
+    expect(d('play_trick')).toMatch(/trick/)
+    expect(d('no_action')).toMatch(/not|nothing/)
+  })
+  it('asks the model not to spend time thinking (it is a simple match; this keeps it fast and steady)', async () => {
+    const calls: { url: string; init: RequestInit }[] = []
+    await interpretCommand('sit', { apiKey: KEY, fetch: okFetch(reply('sit'), calls) })
+    expect(
+      JSON.parse(String(calls[0].init.body)).generationConfig.thinkingConfig.thinkingBudget
+    ).toBe(0)
   })
   it('very long text is cut to 300 characters', async () => {
     const calls: { url: string; init: RequestInit }[] = []

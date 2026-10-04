@@ -69,20 +69,34 @@ async function start(): Promise<void> {
   window.zoomies.onSerialStatus(onSerialStatus)
   // Push-to-talk: the mic is open ONLY while the button is held (controller, the on-screen button, or space).
   const sendCommand = (text: string): void => behaviour?.handleInput({ kind: 'command', text })
+  // Text -> command via the AI (main process); the screen shows what it decided.
+  const interpret = async (t: string): Promise<string> => {
+    const a = await window.zoomies.interpret(t)
+    hud.set('voice', `"${t}" -> ${a === 'error' ? 'word list (AI unavailable)' : a}`)
+    return a
+  }
   const voice = createBrowserVoiceInput(
     (bytes, mime) =>
       void handleClip(
         bytes,
         mime,
         async (b, m) => window.zoomies.transcribe(b, m),
-        (text) => void routeCommand(text, (t) => window.zoomies.interpret(t), sendCommand),
-        sendCommand
+        (text) => void routeCommand(text, interpret, sendCommand),
+        sendCommand,
+        (message) => {
+          console.log(`[voice] ${message}`)
+          hud.set('voice', message)
+        }
       ),
-    (message) => console.warn(`[voice] ${message}`)
+    (message) => {
+      console.warn(`[voice] ${message}`)
+      hud.set('voice', message)
+    }
   )
   const input = (e: InputEvent): void => {
     behaviour?.handleInput(e)
     if (e.kind === 'pushToTalk') {
+      hud.set('voice', e.state === 'start' ? 'listening…' : 'sending…')
       if (e.state === 'start') voice.start()
       else voice.stop()
     }
@@ -104,7 +118,7 @@ async function start(): Promise<void> {
   const commandBar = new CommandBar(
     document.body,
     send,
-    overlay ? null : (text) => void routeCommand(text, (t) => window.zoomies.interpret(t), send),
+    overlay ? null : (text) => void routeCommand(text, interpret, send),
     (state) => input({ kind: 'pushToTalk', state })
   )
   commandBar.setVisible(searchParams.get('commands') === '1')
@@ -170,6 +184,7 @@ async function start(): Promise<void> {
   dog.placeAt(homeX, groundY())
   void dog.moveTo(homeX - 3, groundY(), 'walk')
 
+  if (searchParams.get('log') === '1') Object.assign(window, { __dog: dog }) // dev: poke it from the console
   const ball = createBall(window.innerWidth / 2, groundY() - 200)
   if (behaviourOn) {
     behaviour = new Behaviour({
@@ -196,6 +211,10 @@ async function start(): Promise<void> {
       muted
     })
     brain.onEvent((e) => cues?.handle(e))
+    if (searchParams.get('log') === '1')
+      brain.onEvent((e) => {
+        if (e.kind !== 'bounce') console.log(`[dog] ${JSON.stringify(e)}`)
+      })
     buzzer = new BuzzerCues((p) => window.zoomies.buzz(p))
     buzzer.setEnabled(controllerConnected)
     brain.onEvent((e) => buzzer?.handle(e))

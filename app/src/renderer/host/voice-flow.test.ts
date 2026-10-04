@@ -6,6 +6,7 @@ import { handleClip } from './voice-flow'
 const run = async (heard: string | null | Error): Promise<string[]> => {
   const routed: string[] = []
   const sent: string[] = []
+  const said: string[] = []
   await handleClip(
     new Uint8Array([1]),
     'audio/webm',
@@ -14,22 +15,30 @@ const run = async (heard: string | null | Error): Promise<string[]> => {
       return heard
     },
     (t) => routed.push(t),
-    (t) => sent.push(t)
+    (t) => sent.push(t),
+    (m) => said.push(m)
   )
-  return [...routed.map((t) => `route:${t}`), ...sent.map((t) => `send:${t}`)]
+  return [
+    ...said.map((m) => `say:${m}`),
+    ...routed.map((t) => `route:${t}`),
+    ...sent.map((t) => `send:${t}`)
+  ]
 }
 
 describe('handleClip', () => {
   it('words heard: routed to the command router', async () => {
-    expect(await run('go lie down')).toEqual(['route:go lie down'])
+    expect(await run('go lie down')).toEqual(['say:heard "go lie down"', 'route:go lie down'])
   })
   it('nothing heard: head tilt', async () => {
-    expect(await run('')).toEqual(['send:'])
+    expect(await run('')).toEqual(['say:heard nothing', 'send:'])
   })
   it('transcription failed: head tilt', async () => {
-    expect(await run(null)).toEqual(['send:'])
+    expect(await run(null)).toEqual(['say:could not transcribe (offline or no key?)', 'send:'])
   })
   it('the bridge throwing: head tilt, no crash', async () => {
-    expect(await run(new Error('ipc'))).toEqual(['send:'])
+    expect(await run(new Error('ipc'))).toEqual([
+      'say:could not transcribe (offline or no key?)',
+      'send:'
+    ])
   })
 })

@@ -34,9 +34,18 @@ export class CommandBar {
       talk.textContent = 'Hold to talk'
       talk.style.cssText =
         'padding:5px 10px;border:0;border-radius:7px;background:#f4c542;color:#16212a;cursor:pointer'
-      talk.addEventListener('pointerdown', () => onTalk('start'))
+      let held = false // pointerup AND pointerleave both fire: send one stop per start
+      talk.addEventListener('pointerdown', () => {
+        if (held) return
+        held = true
+        onTalk('start')
+      })
       for (const t of ['pointerup', 'pointerleave', 'pointercancel'] as const)
-        talk.addEventListener(t, () => onTalk('stop'))
+        talk.addEventListener(t, () => {
+          if (!held) return
+          held = false
+          onTalk('stop')
+        })
       root.appendChild(talk)
     }
     if (sendTyped) {

@@ -82,6 +82,7 @@ describe('hold and release', () => {
     r.v.stop()
     await flush()
     expect(r.clips).toHaveLength(0)
+    expect(r.errors).toHaveLength(1) // and the user is told why nothing happened
     expect(r.streams[0].tracksStopped).toBe(1)
   })
   it('stop with nothing started does nothing', async () => {

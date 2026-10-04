@@ -32,7 +32,12 @@ describe('the seven commands', () => {
     ['good job', 'good_boy'],
     ['show me a trick', 'play_trick'],
     ['do a trick', 'play_trick'],
-    ['trick', 'play_trick']
+    ['trick', 'play_trick'],
+    ['jump', 'jump'],
+    ['Jump up!', 'jump'],
+    ['hop', 'jump'],
+    ['leap', 'jump'],
+    ['can you jump', 'jump']
   ]
   for (const [text, want] of cases) {
     it(`"${text}" -> ${want}`, () => expect(parseCommand(text)).toBe(want))
@@ -50,7 +55,9 @@ describe('what is not a command', () => {
     'downtown',
     'fetching',
     '???',
-    'go'
+    'go',
+    'jumper',
+    'hopeful'
   ]) {
     it(`"${text}" -> null`, () => expect(parseCommand(text)).toBeNull())
   }

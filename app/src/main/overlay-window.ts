@@ -18,6 +18,8 @@ function buildQuery(opts: { overlay: boolean; debug: boolean }): string {
   if (process.env.ZOOMIES_DEMO === '1') params.set('demo', '1')
   // ZOOMIES_COMMANDS=1 shows the row of command buttons (no keyboard in the overlay to press C).
   if (process.env.ZOOMIES_COMMANDS === '1') params.set('commands', '1')
+  // ZOOMIES_LOG_RENDERER=1 also makes the page log what the dog does (commands, reactions, fetch steps).
+  if (process.env.ZOOMIES_LOG_RENDERER === '1') params.set('log', '1')
   // ZOOMIES_MUTE=1 starts with the dog's sounds off.
   if (process.env.ZOOMIES_MUTE === '1') params.set('mute', '1')
   return params.toString()
