@@ -7,6 +7,7 @@ import { ClickThroughGate } from './host/click-through'
 import { FrameStats } from './host/frame-stats'
 import { Hud } from './host/hud'
 import { createRenderContext } from './host/scene'
+import { createBall, stepBall } from './world/ball'
 import { World, worldSolids } from './world/world-sdf'
 import { WorldView } from './world/world-view'
 
@@ -85,6 +86,8 @@ async function start(): Promise<void> {
   const dog = await createDog(ctx)
   dog.placeAt(window.innerWidth / 2, groundY())
 
+  const ball = createBall(window.innerWidth / 2, groundY() - 200)
+
   window.addEventListener('mousemove', (e) => dog.lookAt({ x: e.clientX, y: e.clientY }))
   if (!overlay) {
     window.addEventListener('click', (e) => {
@@ -121,6 +124,9 @@ async function start(): Promise<void> {
     const frameMs = now - last
     last = now
     const workStart = performance.now()
+    stepBall(ball, world, frameMs)
+    worldView.setBall(ball)
+    if (!ball.resting) dog.lookAt({ x: ball.x, y: ball.y })
     dog.update(frameMs)
     ctx.renderer.render(ctx.scene, ctx.camera)
     const workMs = performance.now() - workStart
