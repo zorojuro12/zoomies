@@ -42,7 +42,7 @@ describe('what makes the buzzer go', () => {
       fetch('launched'),
       fetch('done'),
       fetch('gaveUp'),
-      { kind: 'pet' } as BehaviourEvent,
+      { kind: 'pet', source: 'mouse' } as BehaviourEvent,
       { kind: 'activity', note: 'fellAsleep' } as BehaviourEvent,
       { kind: 'reaction', id: 'greet', phase: 'start' } as BehaviourEvent
     ]) {

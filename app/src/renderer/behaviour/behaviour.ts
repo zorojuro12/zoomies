@@ -39,7 +39,7 @@ export interface BehaviourOptions {
 }
 
 const SHAKE_SPEED = 2500
-const PET_HOLD_MS = 2500
+const PET_HOLD_MS = 2700
 /** After a touch the dog is drawn at full speed for at least this long. */
 const AWAKE_MS = 1000
 /** A reaction is drawn at full speed for this long while it settles into its pose. */
@@ -75,7 +75,7 @@ export type BehaviourEvent =
   | { kind: 'fetch'; note: FetchNote }
   | { kind: 'activity'; note: ActivityNote }
   | { kind: 'reaction'; id: string; phase: 'start' | 'end' }
-  | { kind: 'pet' }
+  | { kind: 'pet'; source: 'touch' | 'mouse' }
   | { kind: 'call' }
   | { kind: 'talk'; state: 'start' | 'stop' }
   /** A command was given (name null = the dog did not understand it). */
@@ -238,10 +238,13 @@ export class Behaviour {
     } else if (e.kind === 'pet') {
       applyNeedsEvent(this.needs, 'pet')
       if (this.arbiter.request('command', 'pet', 1, PET_HOLD_MS)) {
-        this.emit({ kind: 'pet' })
+        this.emit({ kind: 'pet', source: e.source })
         this.commandHoldMs = PET_HOLD_MS
         this.petting = true
-        void this.dog.setPose('headTilt')
+        // Lie down on its tummy to be petted (stopping first if it was on the move).
+        const at = this.dog.getState()
+        if (at.pose === 'moving') void this.dog.moveTo(at.x, at.y, 'walk')
+        void this.dog.setPose('lie')
         this.extras.setMood('happy', 1)
         this.dog.setLayer({ tailWag: 1 })
       }

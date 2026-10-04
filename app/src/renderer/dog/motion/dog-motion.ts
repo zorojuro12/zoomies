@@ -210,6 +210,11 @@ export class DogMotion implements DogController {
     this.applyFrame(0)
   }
 
+  /** The dog's standing height in px (for things drawn relative to the dog, like the pet hand). */
+  getHeightPx(): number {
+    return this.heightPx
+  }
+
   getYaw(): number {
     return this.yaw
   }
