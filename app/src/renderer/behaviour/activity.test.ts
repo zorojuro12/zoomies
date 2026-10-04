@@ -254,6 +254,28 @@ describe('rounding (many small steps add up to the right time)', () => {
   })
 })
 
+describe('noteInput (the joystick, the button: input that is not mouse or keyboard)', () => {
+  it('resets the idle clock like a mouse move would, and wakes a sleeping dog (once)', () => {
+    const { c, notes } = make()
+    wait(c, 301)
+    expect(c.state.user).toBe('asleep')
+    notes.length = 0
+    c.noteInput()
+    expect(c.state.user).toBe('active')
+    expect(notes).toEqual(['returned'])
+    c.noteInput()
+    expect(notes).toEqual(['returned'])
+  })
+  it('keeps an active user from drifting to idle while they use only the controller', () => {
+    const { c } = make()
+    for (let s = 0; s < 200; s++) {
+      c.noteInput()
+      c.update(1000, 12)
+    }
+    expect(c.state.user).toBe('active')
+  })
+})
+
 describe('forceBreakDue (demo button)', () => {
   it('makes the break due at once, and breakHandled still clears it', () => {
     const { c, notes } = make()

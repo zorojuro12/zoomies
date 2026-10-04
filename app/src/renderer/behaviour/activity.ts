@@ -59,6 +59,12 @@ export class ActivityClassifier {
     this.state.breakDue = false
   }
 
+  /** Input that is not the mouse or keyboard (the joystick, a button): the user is here, reset the idle clock. */
+  noteInput(): void {
+    this.state.idleSec = 0
+    this.recompute()
+  }
+
   /** Pretend the user has just worked the whole break interval (for demos and tests). */
   forceBreakDue(): void {
     this.workedSec = this.timing.breakAfterSec

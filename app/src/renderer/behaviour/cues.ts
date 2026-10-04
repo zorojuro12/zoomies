@@ -134,6 +134,9 @@ export class SoundCues {
       case 'pet':
         this.play('yip_excited', { gain: 0.7 })
         break
+      case 'call':
+        this.play('yip_excited', { gain: 0.8 })
+        break
       case 'bounce':
         this.play('ball_bounce', { x: e.x, gain: 0.25 + 0.75 * e.strength })
         break
