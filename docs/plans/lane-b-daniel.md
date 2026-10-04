@@ -24,7 +24,7 @@
 
 | | From / to | What | When |
 |---|---|---|---|
-| **Needs** | Abel | `assets/views/{side_sit,side_stand,back}.png` + `assets/views/landmarks.json` (format below) | Early P1 — **fallback:** hand-place landmarks on the front photo and assume standard Aussie side proportions |
+| **Needs** | Abel | `assets/views/{side_sit,side_stand,back}.png` — **only for colouring the unseen sides** (P2 coat). **No longer needs `landmarks.json`** (see "Dog spec" below) | P2 — **fallback:** colour the unseen sides from the nearest front-photo colour |
 | **Needs** | Ansh | Overlay + render loop hosting `DogView` | Mid P1 — **until then:** the preview page |
 | **Provides** | Ansh | Real `DogView` + `DogController` (fitted body, poses, walk/run, jumps, ball in mouth) | End P2 (Ansh uses `PlaceholderDog` until then) |
 | **Provides** | Abel | Pose & shape editor in the app | End P2 (Abel tunes likeness in P3) |
@@ -32,7 +32,15 @@
 | **Provides** | Ansh | Step-out-of-photo emergence animation | P4 |
 | **May take over** | Ansh | ElevenLabs L2 / Gemini G2 / G3 if Lane A is behind | Mid P3, once the dog is stable |
 
-### Landmarks format (agree with Abel in the contracts session)
+### Dog spec (decided 2026-10-03, replaces pixel landmarks for fitting)
+Measuring limb lengths from pixel landmarks is fragile (one bad point skews a whole limb) and accuracy needn't be exact, so **Gemini returns a structured "dog spec" directly** and the pipeline starts from a standard Aussie template:
+- **One Gemini call → JSON** (response schema enforced): proportions as **ratios to body height** (`leg_length`, `snout_length`, `ear_size`, `tail_length`, `chest_width`, `head_size`, ...), `ear_type`, `tail_type`, and **per-region colours as hex** (`coat, blaze, chest, paws, cheeks, brows, ear_back, ...`).
+- **Robustness:** 3 calls in parallel (wait = slowest, not the sum), 15 s timeout each, take the **median** of each ratio; if all fail → the default Aussie template. Build-time only, result saved to `aussie.dog.json`, so nothing waits on Gemini on stage.
+- **Clamp** every ratio to a plausible range around the template, so the dog can't come out broken.
+- **Colour snap:** extract the photo's 5–6 dominant colours (k-means) and move each Gemini hex to the nearest real photo colour — Gemini decides *which colour goes where*, the photo supplies the exact paint. Fallback: default Aussie palette.
+- Pixel landmarks (`landmarks.json`) become **optional**, used only by the P3 silhouette optimiser if there's time. Abel's landmark picker is off the critical path.
+
+### Landmarks format (optional — only for the P3 optimiser)
 `assets/views/landmarks.json`:
 ```json
 {
@@ -59,9 +67,9 @@ Abel generates **two side views**: `side_sit` (same sitting pose as the photo, o
 - [ ] **Preview page:** `preview.html` — orthographic camera, transparent/grey background toggle, turntable, pose buttons, FPS/frame-time readout. Your dev harness for the whole weekend.
 - [ ] **Skeleton in code:** bones per §3.3 (spine, neck, head, jaw, ears, 4 × 2-segment legs + paws, tail chain); forward kinematics; rest pose standing.
 - [ ] **SDF ray-marcher:** fragment shader over a screen-space quad around the dog; ~20 primitives (sphere / capsule / ellipsoid / round cone) in bone space, combined with smooth-min (`blend` per shape); soft/toon lighting; per-shape base colour; writes `gl_FragDepth` (needed later for the coat). Step + distance limits for cost.
-- [ ] **Pipeline v1 — placement from landmarks:** cut-out mask (`rembg`) → read landmarks (Abel's JSON, or a tiny hand-placement script on the front photo) → bone lengths/positions and shape sizes from landmark distances (front gives widths, side gives lengths/heights) → `assets/dog/aussie.dog.json` (validated against the schema).
-- [ ] **Colour v0:** per-shape colours sampled from the photo at the shape's projected centre (black coat, white blaze/chest/paws, copper cheeks/brows/legs).
-- **Tests:** smooth-min / primitive SDF maths (TS); landmarks → bone/shape params (pytest); dog file validates against the schema.
+- [ ] **Pipeline v1 — Gemini dog spec** (see "Dog spec" above): standard Aussie template dog file → Gemini call(s) return ratios + ear/tail type + region colours → median, clamp to template ranges → scale bones/shapes → `assets/dog/aussie.dog.json` (validated against the schema). Template-only fallback if Gemini fails. (`rembg` cut-out only if the colour snap needs it.)
+- [ ] **Colour v0:** Gemini's per-region hex colours snapped to the photo's dominant colours (k-means) and assigned to shapes by region (black coat, white blaze/chest/paws, copper cheeks/brows/legs).
+- **Tests:** smooth-min / primitive SDF maths (TS); spec → bone/shape params + clamping + median (pytest, with a fake Gemini response); colour snap (pytest); dog file validates against the schema.
 - **Done when (CP1 — go / no-go):** front and side renders next to the photo; the team agrees it reads as *this* Aussie, or has a concrete tuning list. If not, continue with landmarks + slider tuning (PRD §7) — don't sink P2 into fitting.
 
 ## P2 — MVP: a living, fetching dog
@@ -103,7 +111,8 @@ Abel generates **two side views**: `side_sit` (same sitting pose as the photo, o
 | Risk | Mitigation |
 |---|---|
 | Dog doesn't read as *this* Aussie (head/face) | CP1 side-by-side early; head shapes get the most primitives; editor sliders; colours always from the photo |
-| Gemini side/back views inconsistent or late | Hand-place landmarks on the front photo; standard Aussie proportions for depth; swap in views when they arrive |
+| Gemini dog spec off (wrong ratios/colours) | Median of 3 calls; clamp to template ranges; colour snap to the photo; default Aussie template; editor sliders to fix by eye |
+| Gemini side/back views inconsistent or late | Only needed for unseen-side colours (P2); fall back to front-photo colours |
 | Low-res photo (380×466) limits colour detail | Coat is stylised anyway; ask Abel for the original from Huawei's Drive |
 | Coat splats fighting the SDF surface (z-fighting, flicker) | Depth-test against SDF `gl_FragDepth` with a small offset; rigid-per-shape attachment; fallback to SDF-only |
 | Procedural gait looks robotic | Cartoon timing, body bob, simplify phases; tune in the preview page |
