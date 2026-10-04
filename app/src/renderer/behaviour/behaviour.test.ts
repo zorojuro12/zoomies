@@ -576,6 +576,9 @@ describe('real timing', () => {
 })
 
 describe('whatever happens, it stays sane (fuzz)', () => {
+  // 20 games x 4000 frames of behaviour logic is genuinely heavy (~4s alone); the default 5000ms
+  // testTimeout occasionally trips under full-suite parallel load even though the seed is fixed
+  // and the test itself isn't flaky (2026-10-04, Ansh — flagged to Daniel).
   it('survives 20 random games of activity, input, cursor and windows', () => {
     let seed = 4242
     const rand = (): number => {
@@ -621,5 +624,5 @@ describe('whatever happens, it stays sane (fuzz)', () => {
       expect(h.ball.held).toBe(false)
       expect(h.b.fetch.state).toBe('idle')
     }
-  })
+  }, 20000)
 })

@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Zoomies — sound test</title>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:"
+    />
+    <style>
+      body {
+        margin: 16px;
+        font-family: system-ui, sans-serif;
+        background: #1d2a33;
+        color: #e3e9ed;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 12px;
+      }
+      #controls {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 16px;
+        font-size: 13px;
+      }
+      #controls label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      #rows {
+        display: grid;
+        grid-template-columns: 160px 80px auto;
+        gap: 6px 12px;
+        align-items: center;
+        max-width: 560px;
+      }
+      button {
+        font:
+          13px system-ui,
+          sans-serif;
+        padding: 4px 10px;
+      }
+      .missing {
+        opacity: 0.45;
+      }
+      #status {
+        margin-top: 16px;
+        font:
+          12px ui-monospace,
+          monospace;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sound test</h1>
+    <div id="controls">
+      <label
+        >Pan <span id="panVal">0</span
+        ><input id="pan" type="range" min="-1" max="1" step="0.1" value="0"
+      /></label>
+      <label
+        >Gain <span id="gainVal">1</span
+        ><input id="gain" type="range" min="0" max="1" step="0.05" value="1"
+      /></label>
+    </div>
+    <div id="rows"></div>
+    <div id="status">Loading sounds…</div>
+    <script type="module" src="./audio-test.ts"></script>
+  </body>
+</html>
