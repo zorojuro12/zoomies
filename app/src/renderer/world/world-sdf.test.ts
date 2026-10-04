@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { Point, Rect } from '@shared/geometry'
-import { sdBox, World } from './world-sdf'
+import type { WindowRect } from '@shared/os'
+import { sdBox, worldSolids, World } from './world-sdf'
+
+function windowRect(
+  overrides: Partial<WindowRect> & { x: number; y: number; w: number; h: number }
+): WindowRect {
+  return { id: 'w', title: 'W', z: 0, minimized: false, ...overrides }
+}
 
 describe('sdBox', () => {
   it('is negative inside the rect', () => {
@@ -57,5 +64,35 @@ describe('World.distance / World.normal', () => {
     world.setSolids(solids)
 
     expect(world.distance(500, 400)).toBeCloseTo(400, 3)
+  })
+})
+
+describe('worldSolids', () => {
+  const workArea: Rect = { x: 0, y: 0, w: 1920, h: 1032 }
+
+  it('clips a window to the work area', () => {
+    const windows = [windowRect({ x: -50, y: 100, w: 400, h: 300 })]
+    expect(worldSolids(windows, workArea)).toEqual([{ x: 0, y: 100, w: 350, h: 300 }])
+  })
+
+  it('leaves out a maximized window but keeps one just under 90% of the work area', () => {
+    const maximized = windowRect({ x: 0, y: 0, w: 1920, h: 1032 })
+    const almostMaximized = windowRect({ x: 0, y: 0, w: 1800, h: 980 })
+    expect(worldSolids([maximized], workArea)).toEqual([])
+    expect(worldSolids([almostMaximized], workArea)).toEqual([{ x: 0, y: 0, w: 1800, h: 980 }])
+  })
+
+  it('leaves out a window fully below the work area', () => {
+    const windows = [windowRect({ x: 0, y: 1040, w: 200, h: 200 })]
+    expect(worldSolids(windows, workArea)).toEqual([])
+  })
+
+  it('keeps topmost-first order', () => {
+    const top = windowRect({ id: 'top', x: 0, y: 0, w: 200, h: 200, z: 0 })
+    const behind = windowRect({ id: 'behind', x: 300, y: 0, w: 200, h: 200, z: 1 })
+    expect(worldSolids([top, behind], workArea)).toEqual([
+      { x: 0, y: 0, w: 200, h: 200 },
+      { x: 300, y: 0, w: 200, h: 200 }
+    ])
   })
 })
