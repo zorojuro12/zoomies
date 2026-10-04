@@ -28,8 +28,11 @@ describe('spec files in assets/dog', () => {
         expect(validateDogFile(dog)).toEqual([])
         const body = dog.bones.find((b) => b.name === 'body')!
         const leg = dog.bones.find((b) => b.name === 'leg_fl')!
+        const shin = dog.bones.find((b) => b.name === 'shin_fl')!
         const paw = dog.shapes.find((s) => s.id === 'paw_fl')!
-        expect(body.restPos[1] + leg.restPos[1] + paw.offset[0] + paw.params[0]!).toBeCloseTo(0, 5)
+        const bottom =
+          body.restPos[1] + leg.restPos[1] + shin.restPos[0] + paw.offset[0] + paw.params[0]!
+        expect(bottom).toBeCloseTo(0, 5)
       })
 
       it('has no number that had to be clamped (it was written inside the allowed ranges)', () => {
