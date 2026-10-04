@@ -117,6 +117,8 @@ Changing a contract = a small PR everyone sees. Everything else can change freel
 
 ## 4. Claude Code tooling — load lean, pull in on demand
 
+> **Superseded for Ansh and Abel by `docs/dev-workflow-guide.md` §3**, which was checked against the actual ECC files: `rules/ecc/web/` and `contract-first` turned out not to apply (Core Web Vitals / CSS; OpenAPI-centric), and docs lookup needs a Context7 MCP we don't have. The tiers below remain the general idea.
+
 **Shared vs personal.** The repo's `.claude/` and `CLAUDE.md` hold the **lead's workflow**, used by Lanes A and C. Teammate 2 keeps their own skills/agents in their **personal `~/.claude/`** (user scope) so the two workflows never collide in the repo. Everyone — whatever their workflow — follows the same **repo conventions**: `CLAUDE.md`, branch rules (§5.1), lane ownership (§2), contracts (§3), "never commit keys". Personal tweaks go in `CLAUDE.local.md` / `.claude/settings.local.json` (gitignored).
 
 **For teammate 3 (new to Claude Code):** run in the default permission mode (Claude asks before acting) rather than auto mode, work only on `c/*` branches, and ask the lead before anything touches `app/`. The perennial skills below are their whole toolkit — no need to learn the on-demand list.
@@ -141,13 +143,11 @@ The goal: every session starts with **only what this project needs every time**;
 | `typescript/*` (coding-style, patterns, security, testing) | `app/**/*.ts` | call_it (already path-scoped) / ECC `rules/typescript` |
 | `python/*` (coding-style, patterns, testing) | `pipeline/**/*.py` | ECC `rules/python` |
 | `cpp/*` (trimmed: coding-style only) | `hardware/**` | tickwire / ECC `rules/cpp` |
-| `web/performance.md` | `app/src/renderer/**` | ECC `rules/web` — FPS matters |
 
 ### 4.3 On-demand (pull in when the task needs it, then drop)
 | When | Pull in | Source |
 |---|---|---|
 | Two Claude sessions on one machine / parallel lanes | `using-git-worktrees`, `dispatching-parallel-agents` | Backup in `~/.claude/backups/doctor-2026-10-03/skills/` |
-| Hour 0 contracts | `contract-first` (JSON Schema part) | ECC skills |
 | Before adding a dependency | `search-first` | ECC skills |
 | Library/API questions (Electron, Three.js, Gemini, ElevenLabs) | `documentation-lookup` / `docs-lookup` agent (needs Context7 MCP) | ECC |
 | Vite / electron-vite config trouble | `vite-patterns` | ECC skills |
