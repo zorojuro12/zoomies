@@ -280,9 +280,10 @@
 
 **Checkpoint 3 (manual): debug draw**
 
-- [ ] **Step 1: Implement** — `WorldView` (replaces Task 4's temporary 2D outlines); host updates `World` + `WorldView` on every `onWindows/onWorkArea`.
-- [ ] **Step 2: Verify by hand** — Where: Windows demo laptop. Steps: `$env:ZOOMIES_DEBUG=1; npm run dev`; open two windows, maximize one, restore it. Expected: outlines on non-maximized windows and the work area edge just above the taskbar; the maximized window gets no outline; outlines are gone without `ZOOMIES_DEBUG`.
-- [ ] **Step 3: Commit** — `git add app/src/renderer/world/world-view.ts app/src/renderer/main.ts && git commit -m "feat: world debug view"`
+- [x] **Step 1: Implement** — `WorldView` (replaces Task 4's temporary 2D outlines); host updates `World` + `WorldView` on every `onWindows/onWorkArea`.
+- [x] **Step 2: Verify by hand** — Where: Windows demo laptop. Steps: `$env:ZOOMIES_DEBUG=1; npm run dev`; open two windows, maximize one, restore it. Expected: outlines on non-maximized windows and the work area edge just above the taskbar; the maximized window gets no outline; outlines are gone without `ZOOMIES_DEBUG`.
+  **Result (2026-10-04):** confirmed — green outlines on every real non-minimized window (not just the two tested), minimizing removes a window's outline, the white work-area boundary is visible around a full-screen background window (correctly *not* a per-window outline — that window is excluded as maximized; the white line is just the work-area edge coinciding with it). No outlines at all without `ZOOMIES_DEBUG`.
+- [x] **Step 3: Commit** — `git add app/src/renderer/world/world-view.ts app/src/renderer/main.ts && git commit -m "feat: world debug view"` → `8f6721a`
 
 ---
 
