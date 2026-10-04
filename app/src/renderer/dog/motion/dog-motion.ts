@@ -394,7 +394,14 @@ export class DogMotion implements DogController {
     // dog) — revisit if a running/fetching pose needs a wider box.
     const w = this.heightPx * 1.6
     const h = this.heightPx * 1.25
-    return { x: this.x - w / 2, y: this.y - h + 12, w, h }
+    // A standing quadruped isn't symmetric front-to-back around its spine anchor — the snout
+    // reaches further forward than the tail reaches back — so a box centered exactly on `this.x`
+    // reads as extra padding on the tail side (2026-10-04, Ansh — flagged to Daniel: this is a
+    // hitbox-only nudge, not a real silhouette measurement; tune or replace with an actual bounds
+    // sample if it still looks off for a given pose).
+    const FACING_BIAS = 0.12
+    const offsetX = this.facing * (w / 2) * FACING_BIAS
+    return { x: this.x - w / 2 + offsetX, y: this.y - h + 12, w, h }
   }
 
   hitTest(x: number, y: number): boolean {
