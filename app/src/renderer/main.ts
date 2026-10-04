@@ -7,6 +7,8 @@ import { ClickThroughGate } from './host/click-through'
 import { FrameStats } from './host/frame-stats'
 import { Hud } from './host/hud'
 import { createRenderContext } from './host/scene'
+import { World, worldSolids } from './world/world-sdf'
+import { WorldView } from './world/world-view'
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement
 const status = document.getElementById('status') as HTMLDivElement
@@ -17,55 +19,42 @@ const status = document.getElementById('status') as HTMLDivElement
 // the window is a small fixed-size preview box, not the real desktop.
 const searchParams = new URLSearchParams(window.location.search)
 const overlay = searchParams.get('overlay') === '1'
-// ?debug=1 (ZOOMIES_DEBUG=1): patrol back and forth (Task 1 Checkpoint 2) and draw a 1px outline
-// of every window rect from the OS layer (Task 4 Checkpoint 3) — proves the real/stub window list
-// is wired up; replaced by `world-view.ts` in Task 6.
+// ?debug=1 (ZOOMIES_DEBUG=1): patrol back and forth (Task 1 Checkpoint 2) and draw outlines of
+// the work area + world solids via `WorldView` (Task 6) — proves the real/stub window list feeds
+// the world correctly.
 const debug = searchParams.get('debug') === '1'
 document.body.style.background = overlay ? 'transparent' : '#1d2a33'
-
-function createDebugCanvas(): CanvasRenderingContext2D | null {
-  if (!debug) return null
-  const el = document.createElement('canvas')
-  el.width = window.innerWidth
-  el.height = window.innerHeight
-  el.style.position = 'fixed'
-  el.style.inset = '0'
-  el.style.pointerEvents = 'none'
-  document.body.appendChild(el)
-  return el.getContext('2d')
-}
-
-function drawWindowOutlines(
-  ctx: CanvasRenderingContext2D | null,
-  windows: readonly WindowRect[]
-): void {
-  if (!ctx) return
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-  ctx.strokeStyle = '#00ff88'
-  ctx.lineWidth = 1
-  for (const w of windows) {
-    ctx.strokeRect(w.x + 0.5, w.y + 0.5, w.w - 1, w.h - 1)
-  }
-}
 
 async function start(): Promise<void> {
   const ctx = createRenderContext(canvas)
 
-  let workArea: Rect | null = await window.zoomies.getWorkArea()
+  let workArea: Rect = await window.zoomies.getWorkArea()
   const groundY = (): number =>
-    overlay && workArea ? workArea.y + workArea.h : window.innerHeight - (overlay ? 48 : 40)
+    overlay ? workArea.y + workArea.h : window.innerHeight - (overlay ? 48 : 40)
 
-  const debugCtx = createDebugCanvas()
   const hud = new Hud(status)
+  const world = new World()
+  const worldView = new WorldView(ctx.scene)
+  worldView.setDebug(debug)
+
+  let latestWindows: readonly WindowRect[] = []
+  const syncWorld = (): void => {
+    world.setBounds(workArea)
+    const solids = worldSolids(latestWindows, workArea)
+    world.setSolids(solids)
+    worldView.setSolids(solids, workArea)
+  }
 
   const onWindowsUpdate = (windows: readonly WindowRect[]): void => {
+    latestWindows = windows
     hud.set('world', `${windows.length} windows`)
-    drawWindowOutlines(debugCtx, windows)
+    syncWorld()
   }
   onWindowsUpdate(await window.zoomies.getWindows())
   window.zoomies.onWindows(onWindowsUpdate)
   window.zoomies.onWorkArea((wa) => {
     workArea = wa
+    syncWorld()
   })
 
   let kps = 0
