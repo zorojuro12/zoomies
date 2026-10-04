@@ -33,7 +33,7 @@
 - **Hardware (MLH rental — breadboard only, return it):** joystick, button, touch sensor, buzzer; accelerometer skipped. PRD §8.
 - **Sponsor tracks:** Huawei #2 (primary), Best Hardware, Best Game, ElevenLabs (L1 Must), Gemini (G1 Must), Tiger Data (Could), Best Design maybe; TiDB future scope. PRD §9.
 - **Scheduling rule:** do all Musts and Shoulds; Coulds if time allows, or immediately when cheap alongside related work. PRD §5.
-- **Branching:** branch off `dev` as `<lane>/<task>` (`a/…`, `b/…`, `c/…`), squash-merge PRs into `dev`, Ansh promotes `dev` → `main` at checkpoints (hours 3, 6, 10, 14, 18) and tags it. Tech-stack §5.1.
+- **Branching:** branch off `dev` as `<lane>/<task>` (`a/…`, `b/…`, `c/…`), PRs merge into `dev` with merge commits (no squash), Ansh promotes `dev` → `main` at checkpoints (hours 3, 6, 10, 14, 18) and tags it. Tech-stack §5.1.
 - **Planning:** one master `/impl-plan` for everyone → each lane writes per-phase plans (Ansh with writing-plans, Daniel his own way; Abel mostly works from his checklist). Plan phase 1 in detail, later phases at each checkpoint.
 - **Contracts first:** in hour 0–1, together, define the shared types in `app/src/shared/` (OS layer, dog file, dog controller, input events, serial protocol) with stubs, so lanes don't wait on each other. Tech-stack §3.
 - **Repo `.claude/` is gitignored except the journal skill.** Personal tooling stays local; shared conventions go in a root `CLAUDE.md` (to be written).

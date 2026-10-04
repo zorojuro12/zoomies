@@ -1,0 +1,10 @@
+# Normalise line endings across Windows, macOS and WSL
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.icns binary
+*.mp3 binary
+*.ogg binary
+*.wav binary

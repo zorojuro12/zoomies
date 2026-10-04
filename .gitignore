@@ -3,3 +3,24 @@
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/journal/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Node / build output
+node_modules/
+out/
+dist/
+*.log
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db

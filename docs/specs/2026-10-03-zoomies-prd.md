@@ -42,7 +42,7 @@ StormHacks general criteria (Surge Choice etc.): technical complexity, design, p
 ## 4. Experience: what the dog does
 
 ### 4.0 The dog's look
-**Stylised but faithful — an animated version of *this* dog.** Not photoreal, not a generic cartoon. Proportions are measured from the photo; colours and markings (merle pattern, copper points, white blaze, eye colour, ear shape) are copied from it. Slightly pushed proportions (head, eyes) and cartoon-quality motion. Overall feel: a high-end plush or needle-felted model of the dog, as an animated film would render it.
+**Stylised but faithful — an animated version of *this* dog.** Not photoreal, not a generic cartoon. Proportions are measured from the photo; colours and markings (black tri-colour: black coat, white blaze, chest and paws, copper points on the cheeks, brows and legs; eye colour; ear shape) are copied from it. Slightly pushed proportions (head, eyes) and cartoon-quality motion. Overall feel: a high-end plush or needle-felted model of the dog, as an animated film would render it.
 
 ### 4.1 Hero interaction — slingshot fetch across the desktop
 - **Launch:** pull the joystick back (aim + power), release (or press the button) to fire. Mouse fallback: drag-back-and-release.
@@ -218,6 +218,7 @@ Electron desktop app; **Windows is the target and the demo machine** (team lead'
 - **OS layer behind one interface:** window rects + z-order, input activity timing, click-through. Windows implementation is real; a **screen-edges-only stub** lets Mac teammates run everything else. Full macOS support is out of scope this weekend.
 - **Dev workflow:** code is written in WSL (Claude Code) and pushed to a GitHub repo; a separate clone on the Windows filesystem is pulled and run with **Windows-native Node**. Never share `node_modules` between WSL and Windows — native modules (window enumeration, serial port, input hooks) are rebuilt per OS. Line endings pinned with `.gitattributes` (`* text=auto eol=lf`).
 - **Fast loop:** Claude Code in WSL can drive the Windows clone via `powershell.exe` (pull → install → launch) so testing doesn't require switching terminals.
+- **Option for Lane A:** almost all Lane A work only runs on real Windows (overlay, click-through, window list, hooks, serial). Running Claude Code natively on Windows for this repo avoids the push → pull → rebuild loop.
 
 ## 7. Fallback ladders (decide at checkpoints, don't drift)
 
