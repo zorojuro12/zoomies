@@ -208,11 +208,12 @@ Tests use a `FakePortApi` (in the test file) with `vi.useFakeTimers()`: ports ar
 
 ---
 
-### Gate G — P2 is in `dev`
+### Gate G — P2 is in `dev` and `Behaviour` is wired into `main.ts`
 
-- [ ] PR #22 (`a/p2-mvp-behaviour`) merged into `dev` (check on GitHub). Then `git fetch && git merge origin/dev` into `a/p3-serial`. Resolve `main.ts` by keeping **both** Daniel's behaviour block and the Task 3 `wireController` call; his mouse `pointerup` → `behaviour.handleInput({kind:'launch', …})` is the pattern `onLaunch` must also follow.
+- [x] PR #22 (`a/p2-mvp-behaviour`, P2 Tasks 1–5) merged into `dev` and `dev` merged into `a/p3-serial` (2026-10-04 ~07:15).
+- [ ] P2 Task 7 (`Behaviour` created in `renderer/main.ts`, fed `handleActivity`/`handleInput`/`setWindows`, `update` per frame) — Daniel's, not in PR #22. When it lands in `dev`, `git fetch && git merge origin/dev` again. Resolve `main.ts` by keeping **both** Daniel's behaviour block and the Task 3 `wireController` call; his mouse `pointerup` → `behaviour.handleInput({kind:'launch', …})` is the pattern `onLaunch` must also follow.
 - [ ] `cd app && npm test && npm run typecheck && npm run lint` green; quick `npm run dev` on Windows: mouse fetch still works.
-- [ ] If P2 isn't in by **09:30**, skip to Task 7 (keys + L2's main-process half doesn't need `Behaviour`) and come back.
+- [ ] If P2 Task 7 isn't in by **09:30**, skip to Task 7 (keys + L2's main-process half doesn't need `Behaviour`) and come back.
 
 ---
 
