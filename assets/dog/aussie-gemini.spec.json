@@ -1,0 +1,36 @@
+{
+  "name": "aussie-gemini",
+  "sourcePhoto": "photo/dog.jpeg",
+  "size": 1.05,
+  "proportions": {
+    "bodyLength": 1.05,
+    "bodyDepth": 1.15,
+    "bodyWidth": 1.15,
+    "legLength": 1,
+    "legThickness": 1.15,
+    "neckLength": 1,
+    "headSize": 1.05,
+    "snoutLength": 0.95,
+    "snoutWidth": 1.05,
+    "earSize": 1.05,
+    "tailLength": 1.1,
+    "tailThickness": 1.35
+  },
+  "earType": "semi",
+  "tailType": "fluffy",
+  "colors": {
+    "coat": "#14100d",
+    "chest": "#e3ddd8",
+    "blaze": "#e3ddd8",
+    "muzzle": "#e3ddd8",
+    "cheeks": "#b96a36",
+    "brows": "#c2733a",
+    "legs": "#e3ddd8",
+    "paws": "#e3ddd8",
+    "ears": "#14100d",
+    "tail": "#14100d",
+    "tailTip": "#14100d",
+    "eyes": "#4d3927",
+    "nose": "#14100d"
+  }
+}

@@ -25,6 +25,10 @@ uniform vec3 uParams[MAX_SHAPES];    // shape sizes (see dog-file.ts), zero padd
 uniform float uBlend[MAX_SHAPES];    // smooth-min radius with the rest of the body
 uniform vec3 uColor[MAX_SHAPES];     // linear RGB
 uniform mat4 uInv[MAX_SHAPES];       // world -> shape-local
+uniform vec4 uBound[MAX_SHAPES];     // each shape's bounding sphere: world centre xyz, radius w
+uniform vec4 uDog;                   // one sphere around the whole dog: centre xyz, radius w
+uniform float uHard;                 // x-ray 'shapes' view: 1 = hard union + a flat colour per shape
+uniform vec3 uDebug[MAX_SHAPES];     // the flat colour of each shape in that view
 uniform mat4 uViewProj;              // for writing a correct depth
 uniform float uPixel;                // one device pixel in world units
 
@@ -66,8 +70,13 @@ float map(vec3 p) {
   float d = 1e5;
   for (int i = 0; i < MAX_SHAPES; i++) {
     if (i >= uCount) break;
-    float di = sdShape(i, p);
-    d = (i == 0) ? di : smin(d, di, uBlend[i]);
+    vec4 bs = uBound[i];
+    float db = length(p - bs.xyz) - bs.w; // lower bound of the distance to this shape
+    // smin(d, x, k) is just d once x >= d + k, so a shape whose bound is already that far away
+    // cannot change the result: skip its exact distance function. Same picture, much less work.
+    float reach = (uHard > 0.5) ? 0.0 : uBlend[i];  // hard union has no blend radius
+    float di = (i > 0 && db > d + reach) ? db : sdShape(i, p);
+    d = (i == 0) ? di : ((uHard > 0.5) ? min(d, di) : smin(d, di, uBlend[i]));
   }
   return d;
 }
@@ -84,16 +93,26 @@ void main() {
   vec3 ro = vec3(vWorld.xy, 150.0);
   vec3 rd = vec3(0.0, 0.0, -1.0);
 
-  float t = 0.0;
+  // Most pixels of the quad are empty air: reject a ray that misses the dog's bounding sphere
+  // straight away, and only march the stretch of the ray that is inside it.
+  vec2 off = ro.xy - uDog.xy;
+  float h2 = dot(off, off);
+  float reach = uDog.w + 1.0;                 // +1 px so edge anti-aliasing still works
+  if (h2 > reach * reach) discard;
+  float halfLen = sqrt(max(uDog.w * uDog.w - h2, 0.0));
+  float tStart = max(0.0, ro.z - (uDog.z + halfLen) - 1.0);
+  float tEnd = ro.z - (uDog.z - halfLen) + 1.0;
+
+  float t = tStart;
   float dMin = 1e5;
-  float tMin = 0.0;
+  float tMin = tStart;
   bool hit = false;
-  for (int i = 0; i < 64; i++) {
+  for (int i = 0; i < 48; i++) {
     float d = map(ro + rd * t);
     if (d < dMin) { dMin = d; tMin = t; }
     if (d < 0.02) { hit = true; tMin = t; break; }
     t += max(d, 0.05);
-    if (t > 300.0) break;
+    if (t > tEnd) break;
   }
 
   // Edge anti-aliasing: a ray that just misses the dog still covers part of the pixel.
@@ -108,12 +127,25 @@ void main() {
   float wsum = 0.0;
   for (int i = 0; i < MAX_SHAPES; i++) {
     if (i >= uCount) break;
+    vec4 bs = uBound[i];
+    if (length(p - bs.xyz) - bs.w > 16.0) continue; // too far to have any weight (e^-9 or less)
     // Soft-blended shapes (big blend) mix colours softly; hard small shapes (eyes, nose) stay crisp.
     float w = exp(-max(sdShape(i, p), 0.0) / (0.5 + 0.2 * uBlend[i]));
     col += uColor[i] * w;
     wsum += w;
   }
   col /= max(wsum, 1e-4);
+  if (uHard > 0.5) {
+    // X-ray: no blending, no markings; each pixel takes the flat colour of the shape it belongs to.
+    float best = 1e5;
+    vec3 flatCol = vec3(0.5);
+    for (int i = 0; i < MAX_SHAPES; i++) {
+      if (i >= uCount) break;
+      float di = sdShape(i, p);
+      if (di < best) { best = di; flatCol = uDebug[i]; }
+    }
+    col = flatCol;
+  }
 
   // Ambient occlusion: darken creases (under the chin, between the legs) by sampling the SDF
   // a little way out along the normal.
@@ -138,13 +170,13 @@ void main() {
 
   // Sky/ground ambient.
   float sky = clamp(-n.y * 0.5 + 0.5, 0.0, 1.0);
-  vec3 amb = mix(vec3(0.20, 0.17, 0.15), vec3(0.42, 0.46, 0.55), sky) * 0.55;
+  vec3 amb = mix(vec3(0.20, 0.17, 0.15), vec3(0.42, 0.46, 0.55), sky) * 0.7;
 
   vec3 lit = col * (keyCol * key + fillCol * fill + amb) * ao;
 
   // Rim light: a bright edge where the surface turns away from the viewer.
-  float rim = pow(1.0 - clamp(n.z, 0.0, 1.0), 3.0);
-  lit += vec3(1.0, 0.92, 0.82) * rim * 0.35 * ao;
+  float rim = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.5);
+  lit += vec3(1.0, 0.86, 0.72) * rim * 0.42 * ao;
 
   // Soft sheen so a black coat still shows its form.
   vec3 hv = normalize(L + vec3(0.0, 0.0, 1.0));

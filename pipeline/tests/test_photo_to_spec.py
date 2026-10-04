@@ -90,10 +90,24 @@ def test_calls_run_in_parallel(tmp_path):
     assert time.time() - t0 < 0.8  # ~0.3 s, not 0.9 s
 
 
-def test_colours_are_snapped_to_the_photos_real_colours(tmp_path):
+def test_colours_that_are_nearly_right_get_a_tiny_correction_from_the_photo(tmp_path):
+    # the photo's red is #c80000; Gemini said #c40a0a (a few units away): snap it to the real paint
+    res = p2s.photo_to_spec(make_photo(tmp_path), "rex", ask=lambda b, m: answer(1.0, colors={"coat": "#c40a0a"}), calls=1)
+    assert sd_delta(res.spec["colors"]["coat"], "#c80000") < 3
+    assert res.report["snapped"]["coat"][0] == "#c40a0a"
+
+
+def test_colours_that_are_far_from_the_photo_palette_are_kept_not_dulled(tmp_path):
+    # Real run (Aussie photo): Gemini's copper cheeks were right, but the photo's copper area is tiny
+    # and blends with black fur, so its cluster centre is a dull brown. A big "snap" ruined the colour.
     res = p2s.photo_to_spec(make_photo(tmp_path), "rex", ask=lambda b, m: answer(1.0, colors={"coat": "#e03030"}), calls=1)
-    assert sd_delta(res.spec["colors"]["coat"], "#c80000") < 10
-    assert res.report["snapped"]["coat"][0] == "#e03030"
+    assert res.spec["colors"]["coat"] == "#e03030"
+    assert res.report["snapped"] == {}
+
+
+def test_the_snap_distance_can_be_widened(tmp_path):
+    res = p2s.photo_to_spec(make_photo(tmp_path), "rex", ask=lambda b, m: answer(1.0, colors={"coat": "#e03030"}), calls=1, snap_delta=35)
+    assert sd_delta(res.spec["colors"]["coat"], "#c80000") < 3
 
 
 def sd_delta(a, b):

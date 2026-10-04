@@ -22,6 +22,13 @@ function qz(deg: number): Quat {
   return [0, 0, Math.sin((deg * DEG) / 2), Math.cos((deg * DEG) / 2)]
 }
 
+const WHITE: Vec3 = [1, 1, 1]
+const mix3 = (a: Vec3, b: Vec3, t: number): Vec3 => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+  a[2] + (b[2] - a[2]) * t
+]
+
 export function buildDog(input: unknown): DogFile {
   const spec: DogSpec = normalizeSpec(input)
   const p = spec.proportions
@@ -101,9 +108,10 @@ export function buildDog(input: unknown): DogFile {
     params: number[],
     offset: Vec3,
     blend: number,
-    key: ColorKey
+    key: ColorKey,
+    rgb?: Vec3 // an explicit linear colour instead of a spec colour (shine, inner ear)
   ): void => {
-    shapes.push({ id, kind, bone, params, offset, blend, color: color(key) })
+    shapes.push({ id, kind, bone, params, offset, blend, color: rgb ?? color(key) })
   }
 
   // Body, chest, neck, head, snout
@@ -148,7 +156,19 @@ export function buildDog(input: unknown): DogFile {
   // Nose: a ball at the very tip of the snout, poking ~60% of its radius past the rounded end.
   const noseR = 3.4 * hs * p.snoutWidth
   const snoutTipX = 8 * hs + snoutLen + 6 * hs * p.snoutWidth
-  add('nose', 'sphere', 'head', [noseR], [snoutTipX - 0.4 * noseR, 4.2 * hs, 0], 1, 'nose')
+  const noseAt: Vec3 = [snoutTipX - 0.4 * noseR, 4.2 * hs, 0]
+  add('nose', 'sphere', 'head', [noseR], noseAt, 1, 'nose')
+  // Wet-nose shine: a tiny white dot toward the key light (up, a little forward, toward the viewer).
+  add(
+    'shine',
+    'sphere',
+    'head',
+    [0.3 * noseR],
+    [noseAt[0] + 0.1 * noseR, noseAt[1] - 0.6 * noseR, noseAt[2] + 0.5 * noseR],
+    0.3,
+    'nose',
+    WHITE
+  )
 
   // Jaw: hidden inside the snout while the mouth is closed; when the jaw bone rotates down it
   // swings out below the snout and the mouth reads as open.
@@ -169,12 +189,24 @@ export function buildDog(input: unknown): DogFile {
   ] as const) {
     add(
       `eye_${side}`,
-      'sphere',
+      'ellipsoid', // a ball, but an ellipsoid so its height can squash for a blink (see SdfDog)
       'head',
-      [2.8 * hs],
+      [2.8 * hs, 2.8 * hs, 2.8 * hs],
       [12.1 * hs, -3.2 * hs, z * 10 * hs], // on the front of the head surface, facing forward
       0.5,
       'eyes'
+    )
+    // Catchlight: a small white ellipsoid on the eye, up toward the key light. It is an ellipsoid
+    // so the blink can squash it with the eye (see SdfDog).
+    add(
+      `glint_${side}`,
+      'ellipsoid',
+      'head',
+      [1.0 * hs, 1.0 * hs, 1.0 * hs],
+      [12.1 * hs + 1.4 * hs, -3.2 * hs - 1.6 * hs, z * (10 * hs) + z * 0.7 * hs],
+      0.3,
+      'eyes',
+      WHITE
     )
     add(
       `cheek_${side}`,
@@ -241,6 +273,19 @@ export function buildDog(input: unknown): DogFile {
         'ears'
       )
     }
+    // Inner ear: a smaller, warmer patch on the front face of the ear (the face you see head-on),
+    // coloured halfway between the ear and cheek colours so no new spec key is needed.
+    const outer = shapes[shapes.length - 1]!
+    add(
+      `earin_${side}`,
+      'ellipsoid',
+      `ear_${side}`,
+      [0.55 * outer.params[0]!, 0.7 * outer.params[1]!, 0.8 * outer.params[2]!],
+      [outer.offset[0] + 0.45 * outer.params[0]!, outer.offset[1], outer.offset[2]],
+      1,
+      'ears',
+      mix3(color('ears'), color('cheeks'), 0.55)
+    )
   }
 
   // Tail: three capsules along the chain (slightly tapering) plus a coloured tip.

@@ -23,9 +23,16 @@ export function targetYaw(vx: number, vy: number): number {
   return Math.atan2(-fz, fx)
 }
 
-/** Yaw while standing still: three-quarter view facing the last horizontal direction. */
+/**
+ * Standing still, the dog turns further toward the viewer than when walking: 60° from side-on, so
+ * its face and chest are toward us (you see a front three-quarter, not a profile). It still leans
+ * toward the side it last faced.
+ */
+export const REST_TILT = (60 * Math.PI) / 180
+
+/** Yaw while standing still: front three-quarter view, on the side of the last horizontal direction. */
 export function restYaw(facing: 1 | -1): number {
-  return targetYaw(facing, 0)
+  return Math.atan2(-Math.tan(REST_TILT), facing)
 }
 
 /**

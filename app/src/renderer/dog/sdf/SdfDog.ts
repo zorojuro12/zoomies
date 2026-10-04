@@ -10,11 +10,21 @@ import type { DogController, DogEvent, DogState, Gait, PoseName } from '@shared/
 import type { DogDebugView, DogRenderContext, DogView } from '@shared/dog-view'
 import type { Point, Rect } from '@shared/geometry'
 import { DogMotion } from '../motion/dog-motion'
+import { shapeBound, unionSphereInto } from './bounds'
+import { debugColor, debugFlags } from './debug-view'
+import { createBlink, stepBlink } from '../motion/blink'
+import type { IdleName } from '../motion/idles'
+import type { MoodName } from '../motion/mood'
+import { sampleFur } from '../fur/fur'
+import { FurCoat } from '../fur/fur-renderer'
+import { gpuProblem, shaderProblem } from './gpu-check'
+import type { Sphere } from './bounds'
 import { MAX_SHAPES, SDF_FRAG, SDF_VERT } from './sdf-shader'
 
+/** How many fur strands to scatter over the dog. */
+const FUR_COUNT = 6000
+
 const KIND_INDEX: Record<ShapeKind, number> = { sphere: 0, capsule: 1, ellipsoid: 2, roundCone: 3 }
-/** Extra room around the dog's bounds for the ray-march quad. */
-const QUAD_MARGIN = 80
 
 function makeShadowTexture(): THREE.CanvasTexture {
   const c = document.createElement('canvas')
@@ -37,6 +47,35 @@ export class SdfDog implements DogView, DogController {
   private shadow: THREE.Mesh | null = null
   private boneNodes: THREE.Object3D[] = []
   private offsets: THREE.Matrix4[] = []
+  // x-ray 'landmarks' view: the skeleton (bones as lines, joints as dots) drawn over the dog
+  private skeleton: THREE.Group | null = null
+  private skelLines: THREE.LineSegments | null = null
+  private skelPoints: THREE.Points | null = null
+  private boneNames: string[] = []
+  // the fur coat (splat strands glued to the shapes); null until a dog is built
+  private coat: FurCoat | null = null
+  private furOn = true
+  private coatOnly = false
+  private hardShapes = false
+  // blinking: the eyes' vertical radius shrinks for a moment every few seconds
+  private readonly blink = createBlink(1)
+  private eyeIdx: number[] = []
+  private eyeRy: number[] = []
+  private eyeShut: number[] = [] // how far each closes: eyes to a slit, catchlights to nothing
+  private boneParent: number[] = []
+  private showSkeleton = false
+  private readonly skelPos = new THREE.Vector3()
+  // bounding sphere of each shape: centre on its local x axis (cx) and radius, set once per dog
+  private boundCx: number[] = []
+  private boundR: number[] = []
+  // scratch for the per-frame bounds (reused: no allocation in the frame loop)
+  private readonly shapeWorld = new THREE.Matrix4()
+  private readonly centre = new THREE.Vector3()
+  private readonly bx = new Float64Array(MAX_SHAPES)
+  private readonly by = new Float64Array(MAX_SHAPES)
+  private readonly bz = new Float64Array(MAX_SHAPES)
+  private readonly br = new Float64Array(MAX_SHAPES)
+  private readonly dogSphere: Sphere = { x: 0, y: 0, z: 0, r: 0 }
   private shadowW = 150
   private readonly uniforms = {
     uCount: { value: 0 },
@@ -45,6 +84,10 @@ export class SdfDog implements DogView, DogController {
     uBlend: { value: new Array<number>(MAX_SHAPES).fill(0) },
     uColor: { value: Array.from({ length: MAX_SHAPES }, () => new THREE.Vector3()) },
     uInv: { value: Array.from({ length: MAX_SHAPES }, () => new THREE.Matrix4()) },
+    uBound: { value: Array.from({ length: MAX_SHAPES }, () => new THREE.Vector4()) },
+    uDog: { value: new THREE.Vector4() },
+    uHard: { value: 0 },
+    uDebug: { value: Array.from({ length: MAX_SHAPES }, () => new THREE.Vector3()) },
     uViewProj: { value: new THREE.Matrix4() },
     uPixel: { value: 1 }
   }
@@ -52,6 +95,24 @@ export class SdfDog implements DogView, DogController {
   private get m(): DogMotion {
     if (!this.motion) throw new Error('SdfDog used before init()')
     return this.motion
+  }
+
+  /** The dog's feeling (happy, curious, sleepy, alert, neutral), 0..1 strong. Not part of the contract. */
+  setMood(name: MoodName, intensity = 1): void {
+    this.m.setMood(name, intensity)
+  }
+
+  /** Play an idle trick (yawn, sniff, shake) on the spot; does nothing if the dog is busy. */
+  playIdle(name: IdleName): Promise<void> {
+    return this.m.playIdle(name)
+  }
+
+  /** Turn the extra motion polish on or off (anticipation before jumps, moods, standing life). */
+  setPolish(on: boolean): void {
+    this.m.polish.anticipation = on
+    this.m.polish.mood = on
+    this.m.polish.idle = on
+    this.m.polish.idleTricks = on
   }
 
   // ---- DogView -------------------------------------------------------------------------
@@ -94,6 +155,17 @@ export class SdfDog implements DogView, DogController {
     this.quad.frustumCulled = false
     ctx.scene.add(this.quad)
     this.update(0)
+
+    // Guard against the silent black dog: if this GPU cannot run the shaders, say so loudly (the host
+    // answers with the placeholder dog) instead of drawing nothing.
+    const problem =
+      gpuProblem(ctx.renderer.capabilities) ?? shaderProblem(ctx.renderer, ctx.scene, ctx.camera)
+    if (problem) {
+      for (const o of [this.quad, this.shadow, this.motion?.root, this.coat?.mesh]) {
+        if (o) ctx.scene.remove(o)
+      }
+      throw new Error(`SdfDog cannot run here: ${problem}`)
+    }
   }
 
   /** Build the motion + per-shape shader data for a dog file (used by init and rebuild). */
@@ -106,6 +178,8 @@ export class SdfDog implements DogView, DogController {
     this.scene!.add(motion.root) // holds only bones and the fetch ball; the dog itself is the shader
     this.boneNodes = []
     this.offsets = []
+    this.boundCx = []
+    this.boundR = []
     // Per-shape constants: which bone it rides on, its offset, kind, sizes, blend, colour.
     dog.shapes.forEach((s, i) => {
       this.boneNodes.push(motion.boneNode(s.bone))
@@ -114,9 +188,113 @@ export class SdfDog implements DogView, DogController {
       this.uniforms.uParams.value[i]!.set(s.params[0] ?? 0, s.params[1] ?? 0, s.params[2] ?? 0)
       this.uniforms.uBlend.value[i] = s.blend
       this.uniforms.uColor.value[i]!.fromArray(s.color)
+      this.uniforms.uDebug.value[i]!.fromArray(debugColor(i))
+      const bound = shapeBound(s.kind, s.params)
+      this.boundCx.push(bound.cx)
+      this.boundR.push(bound.r)
     })
     this.uniforms.uCount.value = dog.shapes.length
     this.shadowW = dog.heightPx * 1.4
+    this.eyeIdx = []
+    this.eyeRy = []
+    this.eyeShut = []
+    dog.shapes.forEach((sh, i) => {
+      if (/^(eye|glint)_/.test(sh.id)) {
+        this.eyeIdx.push(i)
+        this.eyeRy.push(sh.params[1] ?? sh.params[0] ?? 1)
+        this.eyeShut.push(sh.id.startsWith('glint') ? 0.99 : 0.92)
+      }
+    })
+    this.buildSkeleton(dog)
+    this.buildCoat(dog)
+  }
+
+  /** Scatter the fur over the dog's rest-pose surface and glue it to the shapes (see dog/fur/). */
+  private buildCoat(dog: DogFile): void {
+    if (this.coat && this.scene) {
+      this.scene.remove(this.coat.mesh)
+      this.coat.dispose()
+    }
+    const fur = sampleFur(dog, FUR_COUNT, 1)
+    this.coat = new FurCoat(fur, dog.heightPx / 108)
+    this.scene!.add(this.coat.mesh)
+    this.refreshCoat()
+  }
+
+  /** The fur shows when it is switched on and we are not looking at the raw shapes; the fur-only view always shows it. */
+  private refreshCoat(): void {
+    if (this.coat) this.coat.visible = (this.furOn && !this.hardShapes) || this.coatOnly
+  }
+
+  /** Fur on/off (for comparing, and as a safety switch). */
+  setFur(on: boolean): void {
+    this.furOn = on
+    this.refreshCoat()
+  }
+
+  /** Bones as lines and joints as dots, hidden until the 'landmarks' x-ray view is chosen. */
+  private buildSkeleton(dog: DogFile): void {
+    if (this.skeleton && this.scene) {
+      this.scene.remove(this.skeleton)
+      this.skelLines?.geometry.dispose()
+      this.skelPoints?.geometry.dispose()
+    }
+    this.boneNames = dog.bones.map((b) => b.name)
+    this.boneParent = dog.bones.map((b) => (b.parent ? this.boneNames.indexOf(b.parent) : -1))
+    const n = this.boneNames.length
+    const lineGeo = new THREE.BufferGeometry()
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 2 * 3), 3))
+    const pointGeo = new THREE.BufferGeometry()
+    pointGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3))
+    this.skelLines = new THREE.LineSegments(
+      lineGeo,
+      // transparent = drawn in the same pass as the dog's transparent quad, and renderOrder 5 puts them on top
+      new THREE.LineBasicMaterial({
+        color: 0x00e5ff,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+      })
+    )
+    this.skelPoints = new THREE.Points(
+      pointGeo,
+      new THREE.PointsMaterial({
+        color: 0xff2d95,
+        size: 4,
+        sizeAttenuation: false,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+      })
+    )
+    for (const o of [this.skelLines, this.skelPoints]) {
+      o.frustumCulled = false
+      o.renderOrder = 5
+    }
+    this.skeleton = new THREE.Group()
+    this.skeleton.add(this.skelLines, this.skelPoints)
+    this.skeleton.visible = this.showSkeleton
+    this.scene!.add(this.skeleton)
+  }
+
+  private updateSkeleton(): void {
+    if (!this.showSkeleton || !this.motion || !this.skelLines || !this.skelPoints) return
+    const lines = this.skelLines.geometry.getAttribute('position') as THREE.BufferAttribute
+    const points = this.skelPoints.geometry.getAttribute('position') as THREE.BufferAttribute
+    for (let i = 0; i < this.boneNames.length; i++) {
+      this.skelPos.setFromMatrixPosition(this.motion.boneNode(this.boneNames[i]!).matrixWorld)
+      points.setXYZ(i, this.skelPos.x, this.skelPos.y, 150)
+      const parent = this.boneParent[i]!
+      if (parent >= 0) {
+        lines.setXYZ(i * 2, points.getX(parent), points.getY(parent), 150)
+        lines.setXYZ(i * 2 + 1, this.skelPos.x, this.skelPos.y, 150)
+      } else {
+        lines.setXYZ(i * 2, this.skelPos.x, this.skelPos.y, 150)
+        lines.setXYZ(i * 2 + 1, this.skelPos.x, this.skelPos.y, 150)
+      }
+    }
+    lines.needsUpdate = true
+    points.needsUpdate = true
   }
 
   /**
@@ -139,27 +317,62 @@ export class SdfDog implements DogView, DogController {
     if (!this.motion || !this.camera || !this.quad || !this.shadow) return
     this.motion.update(dtMs) // poses the skeleton and refreshes world matrices
 
-    // Shader needs world -> shape-local matrices.
-    const inv = this.uniforms.uInv.value
-    for (let i = 0; i < this.boneNodes.length; i++) {
-      inv[i]!.copy(this.boneNodes[i]!.matrixWorld).multiply(this.offsets[i]!).invert()
+    // Blink: squash each eye's height (axis y of the head frame) toward a thin slit and back.
+    // a sleepy mood holds the lids part-way down; a blink still closes them fully
+    const closed = Math.max(stepBlink(this.blink, dtMs / 1000), this.motion.getLidDroop())
+    for (let k = 0; k < this.eyeIdx.length; k++) {
+      this.uniforms.uParams.value[this.eyeIdx[k]!]!.y =
+        this.eyeRy[k]! * (1 - this.eyeShut[k]! * closed)
     }
+
+    // Per shape: the world -> shape-local matrix, and the world position of its bounding sphere.
+    const inv = this.uniforms.uInv.value
+    const bounds = this.uniforms.uBound.value
+    const n = this.boneNodes.length
+    for (let i = 0; i < n; i++) {
+      this.shapeWorld.copy(this.boneNodes[i]!.matrixWorld).multiply(this.offsets[i]!)
+      this.centre.set(this.boundCx[i]!, 0, 0).applyMatrix4(this.shapeWorld)
+      this.bx[i] = this.centre.x
+      this.by[i] = this.centre.y
+      this.bz[i] = this.centre.z
+      this.br[i] = this.boundR[i]!
+      bounds[i]!.set(this.centre.x, this.centre.y, this.centre.z, this.boundR[i]!)
+      inv[i]!.copy(this.shapeWorld).invert()
+      if (this.coat) this.coat.shapeMatrices[i]!.copy(this.shapeWorld)
+    }
+    if (this.coat) {
+      // the fur lies back along the body: the dog's backward axis as it appears on screen
+      this.skelPos.set(-1, 0, 0).transformDirection(this.boneNodes[0]!.matrixWorld)
+      this.coat.setFlow(this.skelPos.x, this.skelPos.y)
+    }
+    // One sphere around the whole dog: the shader rejects every ray outside it, and the quad is
+    // sized to it (instead of a big square), so far fewer pixels are shaded at all.
+    const dog = unionSphereInto(this.dogSphere, this.bx, this.by, this.bz, this.br, n)
+    this.uniforms.uDog.value.set(dog.x, dog.y, dog.z, dog.r)
     this.camera.updateMatrixWorld()
     this.uniforms.uViewProj.value.multiplyMatrices(
       this.camera.projectionMatrix,
       this.camera.matrixWorldInverse
     )
-
-    // Keep the quad centred on the dog, big enough to hold it.
-    const b = this.motion.getBounds()
-    const size = Math.max(b.w, b.h) + QUAD_MARGIN * 2
-    this.quad.position.set(b.x + b.w / 2, b.y + b.h / 2, 0)
+    const size = dog.r * 2 + 8
+    this.quad.position.set(dog.x, dog.y, 0)
     this.quad.scale.set(size, size, 1)
 
-    // Shadow sits under the paws.
+    this.updateSkeleton()
+
+    // Shadow stays on the GROUND under the dog (not under its paws), and shrinks and fades as the
+    // dog rises off it, like a real contact shadow.
     const s = this.motion.getState()
-    this.shadow.position.set(s.x, s.y + 2, -80)
-    this.shadow.scale.set(this.shadowW, this.shadowW * 0.2, 1)
+    const ground = this.motion.getGroundY()
+    const lift = Math.max(0, ground - s.y)
+    const fade = Math.min(1, lift / (this.shadowW * 1.2))
+    this.shadow.position.set(s.x, ground + 2, -80)
+    this.shadow.scale.set(
+      this.shadowW * (1 - 0.35 * fade),
+      this.shadowW * 0.2 * (1 - 0.35 * fade),
+      1
+    )
+    ;(this.shadow.material as THREE.MeshBasicMaterial).opacity = 1 - 0.65 * fade
   }
 
   getBounds(): Rect {
@@ -170,8 +383,15 @@ export class SdfDog implements DogView, DogController {
     return this.m.hitTest(x, y)
   }
 
-  setDebugView(_mode: DogDebugView): void {
-    // X-ray views come later (plan P3).
+  setDebugView(mode: DogDebugView): void {
+    const flags = debugFlags(mode)
+    this.uniforms.uHard.value = flags.hardShapes ? 1 : 0
+    this.showSkeleton = flags.skeleton
+    this.coatOnly = flags.coatOnly
+    this.hardShapes = flags.hardShapes
+    if (this.quad) this.quad.visible = !flags.coatOnly
+    this.refreshCoat()
+    if (this.skeleton) this.skeleton.visible = flags.skeleton
   }
 
   // ---- DogController: delegated to DogMotion --------------------------------------------
