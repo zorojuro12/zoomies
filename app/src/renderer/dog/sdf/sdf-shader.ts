@@ -108,7 +108,8 @@ void main() {
   float wsum = 0.0;
   for (int i = 0; i < MAX_SHAPES; i++) {
     if (i >= uCount) break;
-    float w = exp(-max(sdShape(i, p), 0.0) * 0.6);
+    // Soft-blended shapes (big blend) mix colours softly; hard small shapes (eyes, nose) stay crisp.
+    float w = exp(-max(sdShape(i, p), 0.0) / (0.5 + 0.2 * uBlend[i]));
     col += uColor[i] * w;
     wsum += w;
   }

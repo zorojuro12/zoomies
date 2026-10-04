@@ -3,9 +3,11 @@
 // Starts with the placeholder; Daniel swaps in his SDF dog here first.
 import { ASSETS, assetUrl } from '@shared/assets'
 import type { PoseName } from '@shared/dog-controller'
+import { validateDogFile } from '@shared/dog-file'
 import type { DogFile } from '@shared/dog-file'
 import { PlaceholderDog } from './dog/placeholder/placeholder-dog'
 import { SdfDog } from './dog/sdf/SdfDog'
+import { buildDog } from './dog/spec/build-dog'
 import { createRenderContext, loadJson } from './host/scene'
 
 const POSES: PoseName[] = ['stand', 'sit', 'lie', 'sleep', 'playBow', 'headTilt']
@@ -24,9 +26,17 @@ function button(label: string, onClick: () => void): void {
 async function start(): Promise<void> {
   const ctx = createRenderContext(canvas)
   // ?dog=sdf shows the ray-marched SDF dog; without it, the placeholder stand-in.
-  const useSdf = new URLSearchParams(window.location.search).get('dog') === 'sdf'
+  // ?spec=<name> builds a dog from assets/dog/<name>.spec.json (implies the SDF dog).
+  const params = new URLSearchParams(window.location.search)
+  const specName = params.get('spec')
+  const useSdf = params.get('dog') === 'sdf' || specName !== null
   const dog = useSdf ? new SdfDog() : new PlaceholderDog()
-  await dog.init(ctx, await loadJson<DogFile>(assetUrl(ASSETS.placeholderDog)))
+  const dogFile = specName
+    ? buildDog(await loadJson<unknown>(assetUrl(`dog/${specName}.spec.json`)))
+    : await loadJson<DogFile>(assetUrl(ASSETS.placeholderDog))
+  const errors = validateDogFile(dogFile)
+  if (errors.length > 0) throw new Error(`Invalid dog file: ${errors.join('; ')}`)
+  await dog.init(ctx, dogFile)
   const groundY = (): number => window.innerHeight * 0.7
   dog.placeAt(window.innerWidth / 2, groundY())
 
