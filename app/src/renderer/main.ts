@@ -10,7 +10,11 @@ const status = document.getElementById('status') as HTMLDivElement
 // ?overlay=1 (set by the main process) means we're the real transparent desktop overlay on
 // Windows: no click-to-call (clicks pass through), and the ground sits a bit higher to clear
 // the taskbar. Without it, this is the windowed host (Mac/WSL dev, or ZOOMIES_WINDOWED=1).
-const overlay = new URLSearchParams(window.location.search).get('overlay') === '1'
+const searchParams = new URLSearchParams(window.location.search)
+const overlay = searchParams.get('overlay') === '1'
+// ?debug=1 (ZOOMIES_DEBUG=1): patrol back and forth so the overlay's GPU cost reflects constant
+// motion, not an idle stand — see Task 1 Checkpoint 2 in docs/plans/a-p1-overlay.md.
+const debug = searchParams.get('debug') === '1'
 document.body.style.background = overlay ? 'transparent' : '#1d2a33'
 
 async function start(): Promise<void> {
@@ -26,6 +30,17 @@ async function start(): Promise<void> {
     window.addEventListener('click', (e) => {
       void dog.moveTo(e.clientX, groundY(), 'run').then(() => dog.setPose('sit'))
     })
+  }
+
+  if (debug) {
+    const leftX = window.innerWidth * 0.25
+    const rightX = window.innerWidth * 0.75
+    void (async function patrol(): Promise<void> {
+      for (;;) {
+        await dog.moveTo(rightX, groundY(), 'trot')
+        await dog.moveTo(leftX, groundY(), 'trot')
+      }
+    })()
   }
 
   let last = performance.now()

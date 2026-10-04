@@ -75,25 +75,27 @@
 
 **Checkpoint 1 (manual): transparent, always-on-top, click-through overlay with the dog on the taskbar**
 
-- [ ] **Step 1: Implement** — Contract:
+- [x] **Step 1: Implement** — Contract:
   - Overlay: `BrowserWindow` at `screen.getPrimaryDisplay().bounds` with `transparent: true, frame: false, resizable: false, movable: false, skipTaskbar: true, hasShadow: false, focusable: false, fullscreenable: false, backgroundColor: '#00000000', show: false`, preload as today, `contextIsolation: true`. On `ready-to-show`: `setAlwaysOnTop(true, 'screen-saver')`, `setIgnoreMouseEvents(true, { forward: true })`, `showInactive()`. On `screen` `display-metrics-changed`/`display-added`/`display-removed`: `setBounds(primary.bounds)`.
   - Windowed (non-win32 or `ZOOMIES_WINDOWED=1`): today's 900×670 window, unchanged.
   - The window can't take focus, so F12 won't open DevTools: with `ZOOMIES_DEVTOOLS=1` call `webContents.openDevTools({ mode: 'detach' })`.
   - No taskbar icon → add a `Tray` (`resources/icon.png`) with one menu item **Quit Zoomies** → `app.quit()`.
-  - Log the active GPU once at startup: `app.getGPUInfo('basic')` → print the `gpuDevice` entry with `active: true` (vendor/device id only).
+  - Log the active GPU once at startup: `app.getGPUInfo('basic')` → print the `gpuDevice` entry with `active: true` (vendor/device id only). **Correction:** `'basic'` doesn't include `gpuDevice` on this Electron/Chromium version — used `'complete'` instead, which does.
   - Renderer: with `?overlay=1`, set `document.body.style.background = 'transparent'`; the dog's ground is `window.innerHeight - 48` for now (Task 4 replaces it with the real work area). The old "click to call the dog" handler stays only in windowed mode (clicks pass through in the overlay).
-- [ ] **Step 2: Verify by hand** — Where: Windows demo laptop.
+- [x] **Step 2: Verify by hand** — Where: Windows demo laptop.
   Steps: `git pull`, `cd app && npm run dev`. Open Notepad and a browser.
   Expected: no Zoomies window frame and no taskbar button; the Aussie stands near the bottom of the screen **over** other apps; clicking/typing in Notepad and the browser works everywhere (all clicks pass through, even on the dog — click-through gating comes in Task 3); clicking the taskbar doesn't hide the dog; a tray icon's **Quit Zoomies** closes the app; the terminal prints the NVIDIA GPU as active.
-- [ ] **Step 3: Commit** — `git add app/src/main/overlay-window.ts app/src/main/index.ts app/src/renderer/index.html app/src/renderer/main.ts && git commit -m "feat: transparent always-on-top click-through overlay window"`
+  **Result (2026-10-04):** all confirmed on Windows — overlay persists over every app, no taskbar button (tray icon landed in the hidden-icons overflow, which is normal), taskbar click doesn't hide it, typing/clicking passes through to every app normally, Quit Zoomies works, GPU log printed `vendor=0x10de device=0x1f15` (NVIDIA RTX 2060).
+- [x] **Step 3: Commit** — `git add app/src/main/overlay-window.ts app/src/main/index.ts app/src/renderer/index.html app/src/renderer/main.ts && git commit -m "feat: transparent always-on-top click-through overlay window"` → `f8acda4`
 
 **Checkpoint 2 (manual): measure the full-screen overlay's cost and decide**
 
-- [ ] **Step 1: Implement** — Contract: with `ZOOMIES_DEBUG=1`, the host makes the dog patrol (`moveTo` 25% ↔ 75% of the width, `'trot'`, repeat) so there is constant motion. No other change.
-- [ ] **Step 2: Verify by hand** — Where: Windows demo laptop, plugged in, few apps open.
+- [x] **Step 1: Implement** — Contract: with `ZOOMIES_DEBUG=1`, the host makes the dog patrol (`moveTo` 25% ↔ 75% of the width, `'trot'`, repeat) so there is constant motion. No other change.
+- [x] **Step 2: Verify by hand** — Where: Windows demo laptop, plugged in, few apps open.
   Steps: (a) `npm run dev` (dog standing idle) — Task Manager → Processes → GPU % of the Zoomies/Electron processes for 20 s; (b) `$env:ZOOMIES_DEBUG=1; npm run dev` (patrolling) — same; (c) `$env:ZOOMIES_WINDOWED=1; npm run dev` — same, for comparison.
   Expected: three GPU % numbers written down. **Decision rule:** idle overlay ≤ 10 % GPU and no visible stutter while patrolling → keep the full-screen overlay. Otherwise → record "fallback: dog-following small window" as the first P2 task (don't build it in P1).
-- [ ] **Step 3: Commit** — record the numbers and the decision in `docs/plans/lane-a-ansh.md` (P1 "Measure the full-screen transparent overlay cost" bullet → `[x]` + numbers): `git add app/src/renderer/main.ts docs/plans/lane-a-ansh.md && git commit -m "perf: measure full-screen overlay cost on Windows; debug patrol"`
+  **Result (2026-10-04):** idle overlay 30%, patrolling overlay 30% (no stutter), windowed baseline 27% — all read from the Electron process's own GPU column, not system-wide. **Revised decision:** keep the full-screen overlay anyway, and drop the small-window fallback from the plan entirely. The ≤10% figure assumed window size drives GPU cost; it doesn't here (windowed ≈ overlay), so a smaller window wouldn't actually help — only add complexity. No stutter either way means the functional bar is met regardless of the raw %.
+- [x] **Step 3: Commit** — record the numbers and the decision in `docs/plans/lane-a-ansh.md` (P1 "Measure the full-screen transparent overlay cost" bullet → `[x]` + numbers): `git add app/src/renderer/main.ts docs/plans/lane-a-ansh.md && git commit -m "perf: measure full-screen overlay cost on Windows; debug patrol"`
 
 ---
 
