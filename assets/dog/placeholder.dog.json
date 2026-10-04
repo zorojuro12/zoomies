@@ -1,0 +1,560 @@
+{
+  "version": 1,
+  "name": "placeholder",
+  "sourcePhoto": "photo/dog.jpeg",
+  "heightPx": 110,
+  "bones": [
+    {
+      "name": "body",
+      "parent": null,
+      "restPos": [
+        0,
+        -60,
+        0
+      ],
+      "restRot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "neck",
+      "parent": "body",
+      "restPos": [
+        34,
+        -10,
+        0
+      ],
+      "restRot": [
+        0,
+        0,
+        -0.5,
+        0.866
+      ]
+    },
+    {
+      "name": "head",
+      "parent": "neck",
+      "restPos": [
+        24,
+        0,
+        0
+      ],
+      "restRot": [
+        0,
+        0,
+        0.5,
+        0.866
+      ]
+    },
+    {
+      "name": "ear_l",
+      "parent": "head",
+      "restPos": [
+        -3,
+        -14,
+        7
+      ],
+      "restRot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "ear_r",
+      "parent": "head",
+      "restPos": [
+        -3,
+        -14,
+        -7
+      ],
+      "restRot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "tail",
+      "parent": "body",
+      "restPos": [
+        -40,
+        -6,
+        0
+      ],
+      "restRot": [
+        0,
+        0,
+        0.9848,
+        0.1736
+      ]
+    },
+    {
+      "name": "leg_fl",
+      "parent": "body",
+      "restPos": [
+        28,
+        10,
+        9
+      ],
+      "restRot": [
+        0,
+        0,
+        0.7071,
+        0.7071
+      ]
+    },
+    {
+      "name": "leg_fr",
+      "parent": "body",
+      "restPos": [
+        28,
+        10,
+        -9
+      ],
+      "restRot": [
+        0,
+        0,
+        0.7071,
+        0.7071
+      ]
+    },
+    {
+      "name": "leg_rl",
+      "parent": "body",
+      "restPos": [
+        -28,
+        10,
+        9
+      ],
+      "restRot": [
+        0,
+        0,
+        0.7071,
+        0.7071
+      ]
+    },
+    {
+      "name": "leg_rr",
+      "parent": "body",
+      "restPos": [
+        -28,
+        10,
+        -9
+      ],
+      "restRot": [
+        0,
+        0,
+        0.7071,
+        0.7071
+      ]
+    }
+  ],
+  "shapes": [
+    {
+      "id": "body",
+      "kind": "ellipsoid",
+      "bone": "body",
+      "params": [
+        46,
+        22,
+        20
+      ],
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "blend": 6,
+      "color": [
+        0.03,
+        0.03,
+        0.035
+      ]
+    },
+    {
+      "id": "chest",
+      "kind": "sphere",
+      "bone": "body",
+      "params": [
+        19
+      ],
+      "offset": [
+        26,
+        6,
+        0
+      ],
+      "blend": 6,
+      "color": [
+        0.92,
+        0.91,
+        0.88
+      ]
+    },
+    {
+      "id": "neck",
+      "kind": "capsule",
+      "bone": "neck",
+      "params": [
+        11,
+        10
+      ],
+      "offset": [
+        10,
+        0,
+        0
+      ],
+      "blend": 6,
+      "color": [
+        0.03,
+        0.03,
+        0.035
+      ]
+    },
+    {
+      "id": "head",
+      "kind": "sphere",
+      "bone": "head",
+      "params": [
+        17
+      ],
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "blend": 6,
+      "color": [
+        0.03,
+        0.03,
+        0.035
+      ]
+    },
+    {
+      "id": "snout",
+      "kind": "roundCone",
+      "bone": "head",
+      "params": [
+        10,
+        6,
+        17
+      ],
+      "offset": [
+        8,
+        5,
+        0
+      ],
+      "blend": 6,
+      "color": [
+        0.92,
+        0.91,
+        0.88
+      ]
+    },
+    {
+      "id": "ear_l",
+      "kind": "ellipsoid",
+      "bone": "ear_l",
+      "params": [
+        5,
+        9,
+        3
+      ],
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "blend": 3,
+      "color": [
+        0.03,
+        0.03,
+        0.035
+      ]
+    },
+    {
+      "id": "ear_r",
+      "kind": "ellipsoid",
+      "bone": "ear_r",
+      "params": [
+        5,
+        9,
+        3
+      ],
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "blend": 3,
+      "color": [
+        0.03,
+        0.03,
+        0.035
+      ]
+    },
+    {
+      "id": "tail",
+      "kind": "capsule",
+      "bone": "tail",
+      "params": [
+        8,
+        15
+      ],
+      "offset": [
+        15,
+        0,
+        0
+      ],
+      "blend": 4,
+      "color": [
+        0.03,
+        0.03,
+        0.035
+      ]
+    },
+    {
+      "id": "leg_fl",
+      "kind": "capsule",
+      "bone": "leg_fl",
+      "params": [
+        6,
+        22
+      ],
+      "offset": [
+        22,
+        0,
+        0
+      ],
+      "blend": 4,
+      "color": [
+        0.62,
+        0.33,
+        0.14
+      ]
+    },
+    {
+      "id": "leg_fr",
+      "kind": "capsule",
+      "bone": "leg_fr",
+      "params": [
+        6,
+        22
+      ],
+      "offset": [
+        22,
+        0,
+        0
+      ],
+      "blend": 4,
+      "color": [
+        0.62,
+        0.33,
+        0.14
+      ]
+    },
+    {
+      "id": "leg_rl",
+      "kind": "capsule",
+      "bone": "leg_rl",
+      "params": [
+        6,
+        22
+      ],
+      "offset": [
+        22,
+        0,
+        0
+      ],
+      "blend": 4,
+      "color": [
+        0.62,
+        0.33,
+        0.14
+      ]
+    },
+    {
+      "id": "leg_rr",
+      "kind": "capsule",
+      "bone": "leg_rr",
+      "params": [
+        6,
+        22
+      ],
+      "offset": [
+        22,
+        0,
+        0
+      ],
+      "blend": 4,
+      "color": [
+        0.62,
+        0.33,
+        0.14
+      ]
+    }
+  ],
+  "coat": [],
+  "poses": {
+    "stand": {},
+    "sit": {
+      "body": [
+        0,
+        0,
+        -0.2419,
+        0.9703
+      ],
+      "leg_fl": [
+        0,
+        0,
+        0.8572,
+        0.515
+      ],
+      "leg_fr": [
+        0,
+        0,
+        0.8572,
+        0.515
+      ],
+      "leg_rl": [
+        0,
+        0,
+        0.0872,
+        0.9962
+      ],
+      "leg_rr": [
+        0,
+        0,
+        0.0872,
+        0.9962
+      ],
+      "neck": [
+        0,
+        0,
+        -0.342,
+        0.9397
+      ]
+    },
+    "lie": {
+      "leg_fl": [
+        0,
+        0,
+        0.0436,
+        0.999
+      ],
+      "leg_fr": [
+        0,
+        0,
+        0.0436,
+        0.999
+      ],
+      "leg_rl": [
+        0,
+        0,
+        0.999,
+        0.0436
+      ],
+      "leg_rr": [
+        0,
+        0,
+        0.999,
+        0.0436
+      ],
+      "neck": [
+        0,
+        0,
+        -0.2164,
+        0.9763
+      ]
+    },
+    "sleep": {
+      "leg_fl": [
+        0,
+        0,
+        0.0436,
+        0.999
+      ],
+      "leg_fr": [
+        0,
+        0,
+        0.0436,
+        0.999
+      ],
+      "leg_rl": [
+        0,
+        0,
+        0.999,
+        0.0436
+      ],
+      "leg_rr": [
+        0,
+        0,
+        0.999,
+        0.0436
+      ],
+      "neck": [
+        0,
+        0,
+        0.1305,
+        0.9914
+      ],
+      "head": [
+        0,
+        0,
+        0.0872,
+        0.9962
+      ],
+      "tail": [
+        0,
+        0,
+        0.999,
+        -0.0436
+      ]
+    },
+    "playBow": {
+      "body": [
+        0,
+        0,
+        0.1736,
+        0.9848
+      ],
+      "leg_fl": [
+        0,
+        0,
+        0.5,
+        0.866
+      ],
+      "leg_fr": [
+        0,
+        0,
+        0.5,
+        0.866
+      ],
+      "neck": [
+        0,
+        0,
+        -0.1736,
+        0.9848
+      ],
+      "tail": [
+        0,
+        0,
+        0.9239,
+        0.3827
+      ]
+    },
+    "headTilt": {
+      "head": [
+        0.2588,
+        0,
+        0.4226,
+        0.8682
+      ]
+    }
+  }
+}
