@@ -487,3 +487,108 @@ describe('DogMotion: standing life (weight shift, ear flick, boredom)', () => {
     expect(Math.abs(rollOf(m))).toBeLessThan(1e-6)
   })
 })
+
+describe('DogMotion: idle tricks', () => {
+  const jawZ = (m: DogMotion): number => Math.abs(m.boneNode('jaw').quaternion.z)
+  const tillDone = (m: DogMotion, seconds = 4): void => step(m, seconds)
+
+  it('a yawn opens the jaw wide, closes the eyes, then resolves and shuts the mouth again', async () => {
+    const m = make({})
+    let peakJaw = 0
+    let peakLid = 0
+    const p = m.playIdle('yawn')
+    expect(m.getIdle()).toBe('yawn')
+    for (let f = 0; f < 60 * 2.8; f++) {
+      m.update(1000 / 60)
+      peakJaw = Math.max(peakJaw, jawZ(m))
+      peakLid = Math.max(peakLid, m.getLidDroop())
+    }
+    await p
+    expect(peakJaw).toBeGreaterThan(0.25)
+    expect(peakLid).toBeGreaterThan(0.6)
+    expect(m.getIdle()).toBeNull()
+    expect(jawZ(m)).toBeLessThan(0.01)
+    expect(m.getLidDroop()).toBeLessThan(0.01)
+  })
+
+  it('a shake rattles the body much more than the weight shift does', () => {
+    const roll = (m: DogMotion): number =>
+      new THREE.Euler().setFromQuaternion(m.boneNode('body').quaternion, 'ZYX').x
+    const m = make({})
+    void m.playIdle('shake')
+    let peak = 0
+    for (let f = 0; f < 60 * 1.6; f++) {
+      m.update(1000 / 60)
+      peak = Math.max(peak, Math.abs(roll(m)))
+    }
+    expect(peak).toBeGreaterThan(0.04)
+  })
+
+  it('keeps all four paws on the ground during every trick, for every dog', () => {
+    for (const [name, spec] of DOGS) {
+      for (const trick of ['yawn', 'sniff', 'shake'] as const) {
+        const m = make(spec)
+        void m.playIdle(trick)
+        for (let f = 0; f < 60 * 3; f++) {
+          m.update(1000 / 60)
+          for (const leg of LEGS) {
+            m.pawWorld(leg, tmp)
+            expect(Math.abs(tmp.y - GROUND_Y), `${name} ${trick} ${leg}`).toBeLessThan(1)
+          }
+        }
+      }
+    }
+  })
+
+  it('any command cancels it: the promise resolves and the mouth closes again', async () => {
+    const m = make({})
+    const p = m.playIdle('yawn')
+    step(m, 1.2)
+    expect(jawZ(m)).toBeGreaterThan(0.1)
+    void m.moveTo(700, GROUND_Y, 'walk')
+    await p
+    expect(m.getIdle()).toBeNull()
+    step(m, 0.6)
+    expect(jawZ(m)).toBeLessThan(0.02)
+  })
+
+  it('does nothing while the dog is busy (it never interrupts a walk)', async () => {
+    const m = make({})
+    void m.moveTo(900, GROUND_Y, 'walk')
+    step(m, 0.3)
+    await m.playIdle('yawn')
+    expect(m.getIdle()).toBeNull()
+  })
+
+  it('polish.idle = false: playIdle resolves at once and nothing moves', async () => {
+    const m = make({})
+    m.polish.idle = false
+    await m.playIdle('yawn')
+    step(m, 1.2)
+    expect(jawZ(m)).toBeLessThan(1e-6)
+  })
+
+  it('on its own, a bored standing dog does a trick every so often; with idleTricks off it never does', () => {
+    const seen = (tricksOn: boolean): Set<string> => {
+      const m = make({})
+      m.polish.idleTricks = tricksOn
+      const s = new Set<string>()
+      for (let f = 0; f < 60 * 90; f++) {
+        m.update(1000 / 60)
+        const n = m.getIdle()
+        if (n) s.add(n)
+      }
+      return s
+    }
+    expect(seen(true).size).toBeGreaterThanOrEqual(2)
+    expect(seen(false).size).toBe(0)
+  })
+
+  it('a trick still finishes after a late, long frame', () => {
+    const m = make({})
+    void m.playIdle('shake')
+    m.update(50)
+    tillDone(m)
+    expect(m.getIdle()).toBeNull()
+  })
+})

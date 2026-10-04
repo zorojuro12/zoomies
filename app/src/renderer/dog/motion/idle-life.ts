@@ -20,6 +20,10 @@ export interface IdleLife {
   phase: number
   sinceActive: number
   nextKick: number
+  /** Seconds of standing until the next idle trick is asked for. */
+  nextTrick: number
+  /** Which trick (0 yawn, 1 sniff, 2 shake) the dog should do, or -1; the dog sets it back to -1 when it takes it. */
+  trickReq: number
   seed: number
 }
 
@@ -37,9 +41,12 @@ export function createIdleLife(seed = 1): IdleLife {
     phase: 0,
     sinceActive: 0,
     nextKick: 0,
+    nextTrick: 0,
+    trickReq: -1,
     seed: seed >>> 0 || 1
   }
   s.nextKick = 3 + 5 * nextRand(s)
+  s.nextTrick = 10 + 10 * nextRand(s)
   return s
 }
 
@@ -48,10 +55,14 @@ export function noteActivity(s: IdleLife): void {
   s.sinceActive = 0
 }
 
-/** Advance by dt seconds. `standing` = nothing going on (no move, jump or pose change). */
-export function stepIdleLife(s: IdleLife, dt: number, standing: boolean): void {
+/**
+ * Advance by dt seconds. `standing` = nothing going on (no move, jump or pose change). `quiet` =
+ * an idle trick is playing: the weight shift steps aside, but the dog is still bored (the boredom
+ * timer and the trick schedule keep running).
+ */
+export function stepIdleLife(s: IdleLife, dt: number, standing: boolean, quiet = false): void {
   s.earKick = 0
-  s.weight += ((standing ? 1 : 0) - s.weight) * (1 - Math.exp(-dt * 3))
+  s.weight += ((standing && !quiet ? 1 : 0) - s.weight) * (1 - Math.exp(-dt * 3))
   if (!standing) {
     s.sinceActive = 0
     s.nextKick = Math.max(s.nextKick, 3)
@@ -59,6 +70,13 @@ export function stepIdleLife(s: IdleLife, dt: number, standing: boolean): void {
     s.phase += dt / SWAY_PERIOD
     s.sinceActive += dt
     s.nextKick -= dt
+    s.nextTrick -= dt
+    if (s.nextTrick <= 0 && s.trickReq < 0) {
+      s.trickReq = Math.min(2, Math.floor(nextRand(s) * 3))
+      s.nextTrick = 10 + 10 * nextRand(s)
+    } else if (s.nextTrick <= 0) {
+      s.nextTrick = 0 // still waiting for the last request to be taken
+    }
     if (s.nextKick <= 0) {
       s.earKick = 1
       s.nextKick = 3 + 5 * nextRand(s)
