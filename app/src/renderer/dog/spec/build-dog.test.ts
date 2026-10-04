@@ -280,3 +280,64 @@ describe('buildDog: properties that must hold for EVERY spec', () => {
     })
   }
 })
+
+describe('buildDog: sparkle (catchlights, wet nose) and inner ears', () => {
+  const specs: object[] = [{}, { earType: 'floppy' }, { earType: 'semi' }, ...cornerSpecs()]
+  const dist = (a: number[], b: number[]): number =>
+    Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!)
+  for (const [i, spec] of specs.entries()) {
+    describe(`spec #${i}`, () => {
+      const d = buildDog(spec)
+      for (const side of ['l', 'r']) {
+        it(`the ${side} catchlight is a near-white dot that pokes out of the eye, up toward the key light`, () => {
+          const eye = shape(d, `eye_${side}`)
+          const glint = shape(d, `glint_${side}`)
+          expect(glint.bone).toBe(eye.bone)
+          expect(glint.color.every((c) => c > 0.9)).toBe(true)
+          expect(glint.params[0]!).toBeLessThan(eye.params[0]! * 0.5) // a dot, not a second eye
+          const gap = dist(glint.offset, eye.offset)
+          expect(gap + glint.params[0]!).toBeGreaterThan(eye.params[0]!) // sticks out of the eye
+          expect(gap).toBeLessThan(eye.params[0]!) // centre is still over the eye
+          expect(glint.offset[1]).toBeLessThan(eye.offset[1]) // above (y is down)
+        })
+      }
+      it('the two catchlights mirror each other', () => {
+        const l = shape(d, 'glint_l')
+        const r = shape(d, 'glint_r')
+        expect(l.offset[0]).toBeCloseTo(r.offset[0])
+        expect(l.offset[1]).toBeCloseTo(r.offset[1])
+        expect(l.offset[2]).toBeCloseTo(-r.offset[2])
+      })
+      it('the nose has a small white shine on it', () => {
+        const nose = shape(d, 'nose')
+        const shine = shape(d, 'shine')
+        expect(shine.bone).toBe(nose.bone)
+        expect(shine.color.every((c) => c > 0.9)).toBe(true)
+        expect(shine.params[0]!).toBeLessThan(nose.params[0]! * 0.5)
+        expect(dist(shine.offset, nose.offset) + shine.params[0]!).toBeGreaterThan(nose.params[0]!)
+        expect(shine.offset[1]).toBeLessThan(nose.offset[1])
+      })
+      for (const side of ['l', 'r']) {
+        it(`the ${side} ear has an inner-ear patch on its own bone, sitting in the ear`, () => {
+          const ear = shape(d, `ear_${side}`)
+          const inner = shape(d, `earin_${side}`)
+          expect(inner.bone).toBe(ear.bone)
+          expect(inner.params[0]!).toBeLessThan(ear.params[0]!)
+          expect(inner.params[1]!).toBeLessThan(ear.params[1]!)
+          expect(dist(inner.offset, ear.offset)).toBeLessThan(ear.params[0]!) // centred in the ear
+        })
+      }
+    })
+  }
+  it('the inner ear is a warmer, lighter colour than the outer ear, built from existing spec colours only', () => {
+    const d = buildDog({ colors: { ears: '#101010', cheeks: '#e0a080' } })
+    const ear = shape(d, 'ear_l').color
+    const cheeks = shape(d, 'cheek_l').color
+    const inner = shape(d, 'earin_l').color
+    for (let c = 0; c < 3; c++) {
+      expect(inner[c]!).toBeGreaterThan(Math.min(ear[c]!, cheeks[c]!) - 1e-6)
+      expect(inner[c]!).toBeLessThan(Math.max(ear[c]!, cheeks[c]!) + 1e-6)
+    }
+    expect(inner[0]!).toBeGreaterThan(ear[0]!)
+  })
+})

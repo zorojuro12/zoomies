@@ -30,8 +30,8 @@ export interface FurData {
   size: Float32Array
 }
 
-/** Shapes that must stay bare: the eyes and the nose. */
-const BARE = /^(eye|nose)/
+/** Shapes that must stay bare: the eyes, the nose and their white highlights. */
+const BARE = /^(eye|nose|glint|shine)/
 
 /** The world matrix of each shape in the dog's REST pose: bone chain × the shape's offset. */
 export function shapeRestMatrices(dog: DogFile): THREE.Matrix4[] {

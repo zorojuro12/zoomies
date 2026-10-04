@@ -109,9 +109,11 @@ describe('sampleFur', () => {
         expect(legs).toBeGreaterThan(0.05)
       })
 
-      it('never puts fur on the eyes or the nose', () => {
+      it('never puts fur on the eyes, the nose or their highlights', () => {
         const skip = new Set(
-          dog.shapes.map((s, i) => (/^(eye|nose)/.test(s.id) ? i : -1)).filter((i) => i >= 0)
+          dog.shapes
+            .map((s, i) => (/^(eye|nose|glint|shine)/.test(s.id) ? i : -1))
+            .filter((i) => i >= 0)
         )
         for (let i = 0; i < COUNT; i++) expect(skip.has(fur.shape[i]!)).toBe(false)
       })
