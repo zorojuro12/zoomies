@@ -25,15 +25,15 @@ function button(label: string, onClick: () => void): void {
 
 async function start(): Promise<void> {
   const ctx = createRenderContext(canvas)
-  // ?dog=sdf shows the ray-marched SDF dog; without it, the placeholder stand-in.
-  // ?spec=<name> builds a dog from assets/dog/<name>.spec.json (implies the SDF dog).
+  // No params: Ansh's placeholder stand-in. ?spec=<name> (or ?dog=sdf, = the default spec) shows
+  // the SDF dog built from assets/dog/<name>.spec.json with our own motion.
   const params = new URLSearchParams(window.location.search)
-  const specName = params.get('spec')
-  const useSdf = params.get('dog') === 'sdf' || specName !== null
-  const dog = useSdf ? new SdfDog() : new PlaceholderDog()
-  const dogFile = specName
-    ? buildDog(await loadJson<unknown>(assetUrl(`dog/${specName}.spec.json`)))
-    : await loadJson<DogFile>(assetUrl(ASSETS.placeholderDog))
+  const specName = params.get('spec') ?? (params.get('dog') === 'sdf' ? 'default' : null)
+  const dog = specName !== null ? new SdfDog() : new PlaceholderDog()
+  const dogFile =
+    specName !== null
+      ? buildDog(await loadJson<unknown>(assetUrl(`dog/${specName}.spec.json`)))
+      : await loadJson<DogFile>(assetUrl(ASSETS.placeholderDog))
   const errors = validateDogFile(dogFile)
   if (errors.length > 0) throw new Error(`Invalid dog file: ${errors.join('; ')}`)
   await dog.init(ctx, dogFile)

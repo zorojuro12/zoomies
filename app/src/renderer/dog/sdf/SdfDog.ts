@@ -1,23 +1,18 @@
 // SdfDog — the dog drawn as ray-marched, smoothly blended SDF shapes (see sdf-shader.ts).
 // Implements DogView + DogController (contracts §3.4, §3.5).
 //
-// TEMPORARY BRIDGE: motion (poses, walk, jump, look-at) still comes from the PlaceholderDog,
-// which we keep alive but hide; each frame we read its bone transforms and hand them to the
-// shader. A later phase replaces this with our own skeleton + gait.
+// Motion comes from our own DogMotion (dog/motion/): it poses the skeleton every frame (poses,
+// gait + leg IK, jumps, look-at, tail and ears) and turns the dog toward where it travels. SdfDog
+// only reads each bone's world matrix and hands the matrices to the shader.
 import * as THREE from 'three'
 import type { DogFile, ShapeKind } from '@shared/dog-file'
 import type { DogController, DogEvent, DogState, Gait, PoseName } from '@shared/dog-controller'
 import type { DogDebugView, DogRenderContext, DogView } from '@shared/dog-view'
 import type { Point, Rect } from '@shared/geometry'
-import { PlaceholderDog } from '../placeholder/placeholder-dog'
+import { DogMotion } from '../motion/dog-motion'
 import { MAX_SHAPES, SDF_FRAG, SDF_VERT } from './sdf-shader'
-import { restYaw, stepAngle, targetYaw } from './yaw'
 
 const KIND_INDEX: Record<ShapeKind, number> = { sphere: 0, capsule: 1, ellipsoid: 2, roundCone: 3 }
-/** Below this speed (px/s) the dog counts as standing still and settles into its rest view. */
-const MOVING_SPEED = 20
-/** How quickly the dog swings round to a new heading (higher = snappier). */
-const TURN_RATE = 9
 /** Extra room around the dog's bounds for the ray-march quad. */
 const QUAD_MARGIN = 80
 
@@ -35,18 +30,13 @@ function makeShadowTexture(): THREE.CanvasTexture {
 }
 
 export class SdfDog implements DogView, DogController {
-  private readonly motion = new PlaceholderDog()
-  private root: THREE.Object3D | null = null
+  private motion: DogMotion | null = null
   private camera: THREE.OrthographicCamera | null = null
   private quad: THREE.Mesh | null = null
   private shadow: THREE.Mesh | null = null
   private boneNodes: THREE.Object3D[] = []
   private offsets: THREE.Matrix4[] = []
-  // Turning state: current yaw and last frame's position (for velocity).
-  private yaw = 0
-  private prevX = 0
-  private prevY = 0
-  private hasPrev = false
+  private shadowW = 150
   private readonly uniforms = {
     uCount: { value: 0 },
     uKind: { value: new Array<number>(MAX_SHAPES).fill(0) },
@@ -58,31 +48,25 @@ export class SdfDog implements DogView, DogController {
     uPixel: { value: 1 }
   }
 
+  private get m(): DogMotion {
+    if (!this.motion) throw new Error('SdfDog used before init()')
+    return this.motion
+  }
+
   // ---- DogView -------------------------------------------------------------------------
 
   async init(ctx: DogRenderContext, dog: DogFile): Promise<void> {
     if (dog.shapes.length > MAX_SHAPES) {
       throw new Error(`SdfDog supports at most ${MAX_SHAPES} shapes, got ${dog.shapes.length}`)
     }
-    const before = new Set(ctx.scene.children)
-    await this.motion.init(ctx, dog)
-    this.root = ctx.scene.children.find((c) => !before.has(c)) ?? null
-    if (!this.root) throw new Error('SdfDog: could not find the placeholder dog in the scene')
+    const motion = new DogMotion(dog)
+    this.motion = motion
     this.camera = ctx.camera
-
-    // Hide the placeholder's balls and sticks (keep its ball, radius 7, for the fetch toy).
-    this.root.traverse((o) => {
-      if (!(o instanceof THREE.Mesh)) return
-      const g = o.geometry
-      const isBall = g instanceof THREE.SphereGeometry && g.parameters.radius === 7
-      if (!isBall) o.visible = false
-    })
+    ctx.scene.add(motion.root) // holds only bones and the fetch ball; the dog itself is the shader
 
     // Per-shape constants: which bone it rides on, its offset, kind, sizes, blend, colour.
     dog.shapes.forEach((s, i) => {
-      const bone = this.root!.getObjectByName(s.bone)
-      if (!bone) throw new Error(`SdfDog: bone ${s.bone} not found`)
-      this.boneNodes.push(bone)
+      this.boneNodes.push(motion.boneNode(s.bone))
       this.offsets.push(new THREE.Matrix4().makeTranslation(s.offset[0], s.offset[1], s.offset[2]))
       this.uniforms.uKind.value[i] = KIND_INDEX[s.kind]
       this.uniforms.uParams.value[i]!.set(s.params[0] ?? 0, s.params[1] ?? 0, s.params[2] ?? 0)
@@ -91,6 +75,7 @@ export class SdfDog implements DogView, DogController {
     })
     this.uniforms.uCount.value = dog.shapes.length
     this.uniforms.uPixel.value = 1 / ctx.renderer.getPixelRatio()
+    this.shadowW = dog.heightPx * 1.4
 
     // Soft contact shadow on the ground (drawn behind the dog).
     this.shadow = new THREE.Mesh(
@@ -124,27 +109,8 @@ export class SdfDog implements DogView, DogController {
   }
 
   update(dtMs: number): void {
-    if (!this.root || !this.camera || !this.quad || !this.shadow) return
-    this.motion.update(dtMs)
-
-    // Turn toward where the dog is travelling (sideways = three-quarter view, up the screen =
-    // back to the viewer, down = face to the viewer); settle to the three-quarter view at rest.
-    // (The placeholder sets rotation.y to 0 or π itself; we override it after its update.)
-    const st = this.motion.getState()
-    const dt = dtMs / 1000
-    let target = restYaw(st.facing)
-    if (this.hasPrev && dt > 0) {
-      const vx = (st.x - this.prevX) / dt
-      const vy = st.pose === 'airborne' ? 0 : (st.y - this.prevY) / dt // a jump arc is not "running up"
-      if (vx * vx + vy * vy > MOVING_SPEED * MOVING_SPEED) target = targetYaw(vx, vy)
-    }
-    if (!this.hasPrev) this.yaw = target
-    else this.yaw = stepAngle(this.yaw, target, dt, TURN_RATE)
-    this.prevX = st.x
-    this.prevY = st.y
-    this.hasPrev = true
-    this.root.rotation.y = this.yaw
-    this.root.updateMatrixWorld(true)
+    if (!this.motion || !this.camera || !this.quad || !this.shadow) return
+    this.motion.update(dtMs) // poses the skeleton and refreshes world matrices
 
     // Shader needs world -> shape-local matrices.
     const inv = this.uniforms.uInv.value
@@ -166,50 +132,50 @@ export class SdfDog implements DogView, DogController {
     // Shadow sits under the paws.
     const s = this.motion.getState()
     this.shadow.position.set(s.x, s.y + 2, -80)
-    this.shadow.scale.set(150, 30, 1)
+    this.shadow.scale.set(this.shadowW, this.shadowW * 0.2, 1)
   }
 
   getBounds(): Rect {
-    return this.motion.getBounds()
+    return this.m.getBounds()
   }
 
   hitTest(x: number, y: number): boolean {
-    return this.motion.hitTest(x, y)
+    return this.m.hitTest(x, y)
   }
 
   setDebugView(_mode: DogDebugView): void {
     // X-ray views come later (plan P3).
   }
 
-  // ---- DogController: delegated to the motion bridge ------------------------------------
+  // ---- DogController: delegated to DogMotion --------------------------------------------
 
   setPose(pose: PoseName, opts?: { durationMs?: number }): Promise<void> {
-    return this.motion.setPose(pose, opts)
+    return this.m.setPose(pose, opts)
   }
   moveTo(x: number, y: number, gait: Gait): Promise<void> {
-    return this.motion.moveTo(x, y, gait)
+    return this.m.moveTo(x, y, gait)
   }
   jumpTo(x: number, y: number, opts?: { apexPx?: number }): Promise<void> {
-    return this.motion.jumpTo(x, y, opts)
+    return this.m.jumpTo(x, y, opts)
   }
   lookAt(target: Point | null): void {
-    this.motion.lookAt(target)
+    this.m.lookAt(target)
   }
   setLayer(params: { tailWag?: number; earPerk?: number; breathing?: number }): void {
-    this.motion.setLayer(params)
+    this.m.setLayer(params)
   }
   attachBall(attached: boolean): void {
-    this.motion.attachBall(attached)
+    this.m.attachBall(attached)
   }
   getState(): DogState {
-    return this.motion.getState()
+    return this.m.getState()
   }
   onEvent(cb: (e: DogEvent) => void): () => void {
-    return this.motion.onEvent(cb)
+    return this.m.onEvent(cb)
   }
 
   /** Not part of the contract: place the dog without animating (initial spawn). */
   placeAt(x: number, y: number): void {
-    this.motion.placeAt(x, y)
+    this.m.placeAt(x, y)
   }
 }
