@@ -82,6 +82,8 @@ attention moves toward 1 when the user is active, toward 0 when not, as an expon
 
 ### Task 3: Fetch (landing prediction + state machine)
 
+> **Decided with Daniel (2026-10-04):** a ball the dog cannot reach (resting on a window) is given up on gracefully (runs under it, looks up, head tilt; terrain is P3). The dog brings the ball back to **where the dog was standing when it was thrown** (`dropSpot: 'dogOrigin'`, the default; `'ballOrigin'` brings it to where it was thrown from). A long way home (over 500 px) is a run, otherwise a trot. A fetch demo lives on the preview page: `/preview.html?spec=aussie&fetch=1` (drag the ball back and let go, or press `throw →` / `throw ←`; `shelf on/off` makes a ledge the ball can land on to show the give-up).
+
 `landing.ts`: `predictLanding(ball, world, maxMs): { x, y, tMs }` re-running `stepBall` on a scratch copy (never touches the live ball). `fetch.ts`: states `idle → watching → running → grabbing → returning → dropping → celebrating → idle`, driven by `launch` input, ball state and the dog's events through a `DogController`. Behaviour: look at the ball in flight (`lookAt`), `moveTo` the predicted landing x (run), `attachBall(true)` on arrival (ball hidden in the world, shown in the mouth), `moveTo` near the cursor, `attachBall(false)`, drop the ball there, a wag and a mood. Tests with a fake controller and a scripted ball: the happy path event order; ball re-thrown mid-run (retarget, no double pickup); ball rests inside the dog; ball predicted off-screen (clamp to the work area); user clicks the dog mid-fetch (cancel cleanly, ball released); a random-event fuzz that must always end in `idle` with no ball attached.
 
 ### Task 4: Reactions + arbiter

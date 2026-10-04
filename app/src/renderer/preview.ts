@@ -11,6 +11,12 @@ import { buildDog } from './dog/spec/build-dog'
 import { normalizeSpec } from './dog/spec/dog-spec'
 import { mountSpecEditor } from './ui/editor/spec-editor'
 import { createRenderContext, loadJson } from './host/scene'
+import { Fetch } from './behaviour/fetch'
+import { createBall, stepBall } from './world/ball'
+import type { Ball } from './world/ball'
+import { aimFromDrag, ballHit, launchVelocity } from './world/slingshot'
+import { World } from './world/world-sdf'
+import { WorldView } from './world/world-view'
 
 const POSES: PoseName[] = ['stand', 'sit', 'lie', 'sleep', 'playBow', 'headTilt']
 
@@ -123,6 +129,93 @@ async function start(): Promise<void> {
   button('background', () => document.body.classList.toggle('dark'))
   window.addEventListener('mousemove', (e) => dog.lookAt({ x: e.clientX, y: e.clientY }))
 
+  // ?fetch=1: the fetch demo. A floor, a ball you can drag back and let go (the slingshot), and
+  // the dog fetches it (P2 Task 3). Works here on a Mac, no overlay needed.
+  let tickFetch: ((dtMs: number) => void) | null = null
+  let fetchState = ''
+  if (params.get('fetch') === '1') {
+    const world = new World()
+    const workArea = { x: 0, y: 0, w: window.innerWidth, h: groundY() }
+    world.setBounds(workArea)
+    const worldView = new WorldView(ctx.scene)
+    worldView.setDebug(true) // outlines of the floor and the shelf
+    const ball = createBall(window.innerWidth * 0.7, groundY() - 10)
+    ball.resting = true
+    const hiddenBall: Ball = { ...ball, r: 0 }
+    const fetch = new Fetch({ dog, ball, world, groundY })
+    fetch.onNote((n) => console.log('[fetch]', n))
+    const shelf = {
+      x: window.innerWidth * 0.55,
+      y: groundY() - 170,
+      w: window.innerWidth * 0.25,
+      h: 24
+    }
+    let shelfOn = false
+    const syncSolids = (): void => {
+      const solids = shelfOn ? [shelf] : []
+      world.setSolids(solids)
+      worldView.setSolids(solids, workArea)
+    }
+    syncSolids()
+
+    let dragging = false
+    let aim: { angle: number; power: number } | null = null
+    window.addEventListener('pointerdown', (e) => {
+      if (fetch.carrying || !ballHit(ball, e.clientX, e.clientY)) return
+      dragging = true
+      ball.held = true
+      ball.resting = false
+      ball.vx = 0
+      ball.vy = 0
+    })
+    window.addEventListener('pointermove', (e) => {
+      if (!dragging) return
+      aim = aimFromDrag(ball.x, ball.y, e.clientX, e.clientY)
+      worldView.setAim(ball, aim)
+    })
+    window.addEventListener('pointerup', () => {
+      if (!dragging) return
+      dragging = false
+      ball.held = false
+      if (aim !== null) {
+        launchVelocity(aim.angle, aim.power, ball)
+        fetch.launch()
+      }
+      aim = null
+      worldView.setAim(ball, null)
+    })
+    const throwAuto = (dir: 1 | -1): void => {
+      if (fetch.carrying) return
+      ball.held = false
+      ball.resting = false
+      ball.vx = dir * (700 + Math.random() * 500)
+      ball.vy = -(900 + Math.random() * 600)
+      fetch.launch()
+    }
+    button('throw →', () => throwAuto(1))
+    button('throw ←', () => throwAuto(-1))
+    button('shelf on/off', () => {
+      shelfOn = !shelfOn
+      syncSolids()
+    })
+    button('cancel fetch', () => fetch.cancel())
+    button('reset ball', () => {
+      fetch.cancel()
+      ball.x = window.innerWidth * 0.7
+      ball.y = groundY() - 10
+      ball.vx = 0
+      ball.vy = 0
+      ball.held = false
+      ball.resting = true
+    })
+    tickFetch = (dtMs) => {
+      stepBall(ball, world, dtMs)
+      fetch.update(dtMs)
+      worldView.setBall(fetch.carrying ? hiddenBall : ball) // hidden while it is in the dog's mouth
+      fetchState = `fetch ${fetch.state}`
+    }
+  }
+
   // Deterministic mode for comparing renders: ?pose=sit starts in that pose, ?freeze=N steps a
   // fixed 1/60 s per frame and stops the dog after N frames, so two runs show the same instant.
   const startPose = params.get('pose')
@@ -135,10 +228,11 @@ async function start(): Promise<void> {
     let dt = now - last
     last = now
     if (freezeAfter > 0) dt = frameCount++ < freezeAfter ? 1000 / 60 : 0
+    tickFetch?.(dt)
     dog.update(dt)
     ctx.renderer.render(ctx.scene, ctx.camera)
     const s = dog.getState()
-    status.textContent = `${dt.toFixed(1)} ms · pose ${s.pose} · facing ${s.facing}`
+    status.textContent = `${dt.toFixed(1)} ms · pose ${s.pose} · facing ${s.facing}${fetchState ? ` · ${fetchState}` : ''}`
     requestAnimationFrame(frame)
   }
   requestAnimationFrame(frame)
