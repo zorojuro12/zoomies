@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zorojuro12/zoomies/dog-file.schema.json",
+  "title": "Zoomies dog file",
+  "description": "Keep in sync with app/src/shared/dog-file.ts. Cross-references (bones/shapes) are checked by validateDogFile().",
+  "type": "object",
+  "required": ["version", "name", "sourcePhoto", "heightPx", "bones", "shapes", "coat", "poses"],
+  "additionalProperties": false,
+  "$defs": {
+    "vec3": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "quat": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 4,
+      "maxItems": 4
+    }
+  },
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "name": {
+      "type": "string"
+    },
+    "sourcePhoto": {
+      "type": "string"
+    },
+    "heightPx": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "bones": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "parent", "restPos", "restRot"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "parent": {
+            "type": ["string", "null"]
+          },
+          "restPos": {
+            "$ref": "#/$defs/vec3"
+          },
+          "restRot": {
+            "$ref": "#/$defs/quat"
+          }
+        }
+      }
+    },
+    "shapes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "bone", "params", "offset", "blend", "color"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["sphere", "capsule", "ellipsoid", "roundCone"]
+          },
+          "bone": {
+            "type": "string"
+          },
+          "params": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "offset": {
+            "$ref": "#/$defs/vec3"
+          },
+          "blend": {
+            "type": "number",
+            "minimum": 0
+          },
+          "color": {
+            "$ref": "#/$defs/vec3"
+          }
+        }
+      }
+    },
+    "coat": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["shape", "pos", "scale", "color", "opacity"],
+        "additionalProperties": false,
+        "properties": {
+          "shape": {
+            "type": "string"
+          },
+          "pos": {
+            "$ref": "#/$defs/vec3"
+          },
+          "scale": {
+            "$ref": "#/$defs/vec3"
+          },
+          "color": {
+            "$ref": "#/$defs/vec3"
+          },
+          "opacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "poses": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/$defs/quat"
+        }
+      }
+    }
+  }
+}

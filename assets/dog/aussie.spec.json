@@ -1,0 +1,36 @@
+{
+  "name": "aussie",
+  "sourcePhoto": "photo/dog.jpeg",
+  "size": 1.15,
+  "proportions": {
+    "bodyLength": 1.0,
+    "bodyDepth": 1.15,
+    "bodyWidth": 1.3,
+    "legLength": 1.0,
+    "legThickness": 1.1,
+    "neckLength": 0.95,
+    "headSize": 1.25,
+    "snoutLength": 0.9,
+    "snoutWidth": 1.0,
+    "earSize": 1.0,
+    "tailLength": 1.0,
+    "tailThickness": 0.85
+  },
+  "earType": "semi",
+  "tailType": "fluffy",
+  "colors": {
+    "coat": "#17171a",
+    "chest": "#f4f1ea",
+    "blaze": "#f6f3ec",
+    "muzzle": "#ece3d4",
+    "cheeks": "#b5692a",
+    "brows": "#c1782f",
+    "legs": "#a2602b",
+    "paws": "#f4f1ea",
+    "ears": "#17171a",
+    "tail": "#1b1b1e",
+    "tailTip": "#1b1b1e",
+    "eyes": "#4a2c12",
+    "nose": "#0e0e10"
+  }
+}

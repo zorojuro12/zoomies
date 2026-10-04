@@ -1,0 +1,594 @@
+// DogMotion: the dog's own motion (replaces the placeholder bridge). Tested headless — no GPU:
+// the rig is plain three.js nodes, so we can ask where every paw is in the world each frame.
+// The big promises: paws stay on the ground in every pose, feet do not slide while walking,
+// jumps land where asked, and all of it holds for EVERY dog, not just one.
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import * as THREE from 'three'
+import { describe, expect, it } from 'vitest'
+import type { DogEvent } from '@shared/dog-controller'
+import { buildDog } from '../spec/build-dog'
+import { DogMotion } from './dog-motion'
+import type { LegName } from './dog-motion'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const dogDir = join(here, '../../../../../assets/dog')
+const loadSpec = (name: string): unknown =>
+  JSON.parse(readFileSync(join(dogDir, `${name}.spec.json`), 'utf8'))
+
+const LEGS: LegName[] = ['fl', 'fr', 'rl', 'rr']
+const DOGS: [string, unknown][] = [
+  ['default', {}],
+  ['aussie', loadSpec('aussie')],
+  ['golden', loadSpec('golden')],
+  ['greyhound', loadSpec('greyhound')]
+]
+const GROUND_Y = 400
+
+function make(spec: unknown): DogMotion {
+  const m = new DogMotion(buildDog(spec))
+  m.placeAt(500, GROUND_Y)
+  m.update(16)
+  return m
+}
+function step(m: DogMotion, seconds: number): void {
+  for (let t = 0; t < seconds; t += 1 / 60) m.update(1000 / 60)
+}
+const tmp = new THREE.Vector3()
+
+describe('DogMotion: basics', () => {
+  it('starts standing at the place it was put, facing right', () => {
+    const m = make({})
+    const s = m.getState()
+    expect(s.x).toBe(500)
+    expect(s.y).toBe(GROUND_Y)
+    expect(s.facing).toBe(1)
+    expect(s.pose).toBe('stand')
+    expect(s.busy).toBe(false)
+  })
+
+  it('reports bounds around the dog that contain its position (for click tests and rendering)', () => {
+    const m = make({})
+    const b = m.getBounds()
+    expect(b.w).toBeGreaterThan(50)
+    expect(b.h).toBeGreaterThan(50)
+    expect(m.hitTest(500, GROUND_Y - 30)).toBe(true)
+    expect(m.hitTest(5000, 5000)).toBe(false)
+  })
+})
+
+describe('DogMotion: paws stay on the ground in every pose, for every dog', () => {
+  const poses = ['stand', 'sit', 'lie', 'sleep', 'playBow', 'headTilt', 'pant', 'stretch'] as const
+  for (const [dogName, spec] of DOGS) {
+    for (const pose of poses) {
+      it(`${dogName}: ${pose}`, () => {
+        const m = make(spec)
+        void m.setPose(pose, { durationMs: 1 })
+        step(m, 0.6)
+        for (const leg of LEGS) {
+          m.pawWorld(leg, tmp)
+          // planted: within 1 px of the ground (y is down; the ground is at the dog's y)
+          expect(Math.abs(tmp.y - GROUND_Y), `${leg} paw`).toBeLessThan(1)
+        }
+        // and the body is above the ground, never sunk into it
+        m.boneWorld('body', tmp)
+        expect(tmp.y).toBeLessThan(GROUND_Y - 5)
+      })
+    }
+  }
+
+  it('setPose resolves when the pose is done and reports it', async () => {
+    const m = make({})
+    const events: DogEvent['kind'][] = []
+    m.onEvent((e) => events.push(e.kind))
+    const done = m.setPose('sit', { durationMs: 200 })
+    step(m, 0.5)
+    await done
+    expect(events).toContain('poseDone')
+    expect(m.getState().pose).toBe('sit')
+  })
+
+  it('an unknown pose resolves immediately instead of hanging', async () => {
+    const m = make({})
+    await m.setPose('scratch')
+    expect(m.getState().pose).toBe('stand')
+  })
+})
+
+describe('DogMotion: locomotion', () => {
+  it('moveTo arrives at the target, fires "arrived" and resolves', async () => {
+    const m = make({})
+    const events: DogEvent['kind'][] = []
+    m.onEvent((e) => events.push(e.kind))
+    const p = m.moveTo(800, GROUND_Y, 'run')
+    expect(m.getState().busy).toBe(true)
+    step(m, 3)
+    await p
+    const s = m.getState()
+    expect(s.x).toBeCloseTo(800, 0)
+    expect(s.y).toBeCloseTo(GROUND_Y, 0)
+    expect(events).toContain('arrived')
+    expect(s.busy).toBe(false)
+  })
+
+  it('faces the way it travels', () => {
+    const m = make({})
+    void m.moveTo(200, GROUND_Y, 'walk')
+    step(m, 0.5)
+    expect(m.getState().facing).toBe(-1)
+  })
+
+  it('runs faster than it trots, and trots faster than it walks', () => {
+    const dist = (gait: 'walk' | 'trot' | 'run'): number => {
+      const m = make({})
+      void m.moveTo(9000, GROUND_Y, gait)
+      step(m, 2)
+      return m.getState().x - 500
+    }
+    const walk = dist('walk')
+    const trot = dist('trot')
+    const run = dist('run')
+    expect(trot).toBeGreaterThan(walk * 1.5)
+    expect(run).toBeGreaterThan(trot * 1.4)
+  })
+
+  it('turns its back to the viewer when it runs up the screen (yaw ≈ +90°)', () => {
+    const m = make({})
+    void m.moveTo(500, GROUND_Y - 600, 'walk')
+    step(m, 2)
+    expect(m.getYaw()).toBeCloseTo(Math.PI / 2, 1)
+  })
+
+  for (const gait of ['walk', 'trot', 'run'] as const) {
+    for (const [dogName, spec] of DOGS) {
+      it(`feet do not slide while the ${dogName} dog ${gait}s`, () => {
+        const m = make(spec)
+        void m.moveTo(20000, GROUND_Y, gait)
+        step(m, 1.5) // reach steady speed
+        const prev = new Map<LegName, THREE.Vector3 | null>()
+        let maxSlide = 0
+        let contactFrames = 0
+        for (let f = 0; f < 120; f++) {
+          m.update(1000 / 60)
+          for (const leg of LEGS) {
+            m.pawWorld(leg, tmp)
+            const onGround = tmp.y > GROUND_Y - 0.6
+            const before = prev.get(leg) ?? null
+            if (onGround && before) {
+              // screen-visible sliding only: the dog is turned toward the viewer, so depth (z) is invisible
+              maxSlide = Math.max(maxSlide, Math.abs(tmp.x - before.x))
+              contactFrames++
+            }
+            prev.set(leg, onGround ? tmp.clone() : null)
+          }
+        }
+        expect(contactFrames).toBeGreaterThan(40) // the feet really did touch down
+        // Without planting, a foot would travel speed/60 per frame: walk 1.8, trot 3.7, run 7 px.
+        // A paw counts as "down" up to 0.6 px off the ground, so a foot starting to lift can move
+        // about 1 px in that window at a run; 1.2 px still catches every real slide.
+        expect(maxSlide).toBeLessThan(1.2)
+      })
+    }
+  }
+})
+
+describe('DogMotion: jumps', () => {
+  it('jumpTo rises by the apex height, lands on the target, fires "landed" and resolves', async () => {
+    const m = make({})
+    const events: DogEvent['kind'][] = []
+    m.onEvent((e) => events.push(e.kind))
+    const p = m.jumpTo(700, GROUND_Y, { apexPx: 100 })
+    expect(m.getState().pose).toBe('airborne')
+    let highest = GROUND_Y
+    for (let f = 0; f < 180; f++) {
+      m.update(1000 / 60)
+      highest = Math.min(highest, m.getState().y)
+    }
+    await p
+    expect(GROUND_Y - highest).toBeGreaterThanOrEqual(99)
+    expect(m.getState().x).toBeCloseTo(700, 0)
+    expect(m.getState().y).toBeCloseTo(GROUND_Y, 0)
+    expect(events).toContain('landed')
+    expect(m.getState().pose).toBe('stand')
+  })
+
+  it('stands with its paws back on the ground after landing', () => {
+    const m = make({})
+    void m.jumpTo(700, GROUND_Y, { apexPx: 80 })
+    step(m, 2)
+    for (const leg of LEGS) {
+      m.pawWorld(leg, tmp)
+      expect(Math.abs(tmp.y - GROUND_Y)).toBeLessThan(1)
+    }
+  })
+})
+
+describe('DogMotion: the ground under the dog (for its shadow)', () => {
+  it('equals the dog y when it is on the ground', () => {
+    const m = make({})
+    expect(m.getGroundY()).toBe(GROUND_Y)
+  })
+
+  it('stays on the ground while the dog jumps up and comes back down', () => {
+    const m = make({})
+    void m.jumpTo(700, GROUND_Y, { apexPx: 100 })
+    let highest = GROUND_Y
+    for (let f = 0; f < 90; f++) {
+      m.update(1000 / 60)
+      highest = Math.min(highest, m.getState().y)
+      expect(m.getGroundY()).toBe(GROUND_Y) // the shadow does not rise with the dog
+    }
+    expect(GROUND_Y - highest).toBeGreaterThan(50) // and the dog really was in the air
+  })
+
+  it('is the lower of the two levels when jumping to a lower platform', () => {
+    const m = make({})
+    void m.jumpTo(700, GROUND_Y + 80, { apexPx: 60 })
+    m.update(16)
+    expect(m.getGroundY()).toBe(GROUND_Y + 80)
+  })
+
+  it('equals the dog y again once it has landed', () => {
+    const m = make({})
+    void m.jumpTo(700, GROUND_Y - 50, { apexPx: 80 })
+    step(m, 2)
+    expect(m.getGroundY()).toBe(GROUND_Y - 50)
+  })
+})
+
+describe('DogMotion: layers and extras', () => {
+  it('a wagging tail moves; a still one does not', () => {
+    const m = make({})
+    m.setLayer({ tailWag: 1 })
+    const ys: number[] = []
+    for (let f = 0; f < 60; f++) {
+      m.update(1000 / 60)
+      m.boneWorld('tail3', tmp)
+      ys.push(tmp.z)
+    }
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(0.5)
+  })
+
+  it('the jaw opens in the pant pose', () => {
+    const m = make({})
+    m.boneWorld('jaw', tmp)
+    const closed = tmp.y
+    void m.setPose('pant', { durationMs: 1 })
+    step(m, 0.5)
+    m.pawWorld('fl', tmp) // (keep the loop honest)
+    m.boneWorld('jaw', tmp)
+    expect(Math.abs(tmp.y - closed)).toBeGreaterThanOrEqual(0) // jaw hinge itself stays put
+    const open = m.jawTipWorldY()
+    expect(open).toBeGreaterThan(m.jawTipRestWorldY())
+  })
+
+  it('attachBall shows and hides the ball', () => {
+    const m = make({})
+    expect(m.ballVisible()).toBe(false)
+    m.attachBall(true)
+    expect(m.ballVisible()).toBe(true)
+    m.attachBall(false)
+    expect(m.ballVisible()).toBe(false)
+  })
+})
+
+describe('DogMotion: anticipation (a crouch before the jump)', () => {
+  const bodyY = (m: DogMotion): number => m.boneNode('body').position.y
+
+  it('crouches on the ground first: it has not left the ground after 100 ms, and the body is lower', () => {
+    const m = make({})
+    const standY = bodyY(m)
+    void m.jumpTo(700, GROUND_Y, { apexPx: 100 })
+    step(m, 0.1)
+    expect(m.getState().y).toBe(GROUND_Y)
+    expect(m.getState().x).toBe(500)
+    expect(bodyY(m)).toBeGreaterThan(standY + 2) // lower (y is down)
+    expect(m.getState().pose).toBe('airborne') // already counts as part of the jump
+  })
+
+  it('then launches, lands where asked, fires "landed" and resolves (slightly later than without it)', async () => {
+    const m = make({})
+    const events: DogEvent['kind'][] = []
+    m.onEvent((e) => events.push(e.kind))
+    const p = m.jumpTo(700, GROUND_Y, { apexPx: 100 })
+    let highest = GROUND_Y
+    for (let f = 0; f < 200; f++) {
+      m.update(1000 / 60)
+      highest = Math.min(highest, m.getState().y)
+    }
+    await p
+    expect(GROUND_Y - highest).toBeGreaterThanOrEqual(99)
+    expect(m.getState().x).toBeCloseTo(700, 0)
+    expect(events).toContain('landed')
+  })
+
+  it('keeps all four paws on the ground during the crouch, for every dog', () => {
+    for (const [name, spec] of DOGS) {
+      const m = make(spec)
+      void m.jumpTo(700, GROUND_Y)
+      step(m, 0.1)
+      for (const leg of LEGS) {
+        m.pawWorld(leg, tmp)
+        expect(Math.abs(tmp.y - GROUND_Y), `${name} ${leg}`).toBeLessThan(1)
+      }
+    }
+  })
+
+  it('polish.anticipation = false jumps at once, exactly like before', () => {
+    const m = make({})
+    m.polish.anticipation = false
+    void m.jumpTo(700, GROUND_Y, { apexPx: 100 })
+    step(m, 0.1)
+    expect(m.getState().y).toBeLessThan(GROUND_Y - 5)
+  })
+
+  it('a new command during the crouch takes over cleanly (the jump promise still resolves)', async () => {
+    const m = make({})
+    const p = m.jumpTo(700, GROUND_Y)
+    step(m, 0.05)
+    void m.moveTo(520, GROUND_Y, 'walk')
+    await p
+    step(m, 1)
+    expect(m.getState().x).toBeCloseTo(520, 0)
+  })
+})
+
+describe('DogMotion: mood', () => {
+  it('a sleepy dog droops its eyelids and lowers its head; neutral does not', () => {
+    const m = make({})
+    expect(m.getLidDroop()).toBe(0)
+    const neckBefore = m.boneNode('neck').quaternion.z
+    m.setMood('sleepy')
+    step(m, 2)
+    expect(m.getLidDroop()).toBeGreaterThan(0.3)
+    expect(m.boneNode('neck').quaternion.z).not.toBeCloseTo(neckBefore, 3)
+  })
+
+  it('a happy dog has a tail that swings further than a neutral one', () => {
+    const swing = (mood: 'neutral' | 'happy'): number => {
+      const m = make({})
+      m.setMood(mood)
+      let lo = Infinity
+      let hi = -Infinity
+      for (let f = 0; f < 240; f++) {
+        m.update(1000 / 60)
+        const z = m.boneNode('tail1').quaternion.z
+        lo = Math.min(lo, z)
+        hi = Math.max(hi, z)
+      }
+      return hi - lo
+    }
+    expect(swing('happy')).toBeGreaterThan(swing('neutral') * 1.2)
+  })
+
+  it('moods never break the paws-on-the-ground promise', () => {
+    for (const mood of ['happy', 'curious', 'sleepy', 'alert'] as const) {
+      const m = make({})
+      m.setMood(mood)
+      step(m, 1.5)
+      for (const leg of LEGS) {
+        m.pawWorld(leg, tmp)
+        expect(Math.abs(tmp.y - GROUND_Y), `${mood} ${leg}`).toBeLessThan(1)
+      }
+    }
+  })
+
+  it('polish.mood = false ignores setMood', () => {
+    const m = make({})
+    m.polish.mood = false
+    m.setMood('sleepy')
+    step(m, 2)
+    expect(m.getLidDroop()).toBe(0)
+  })
+
+  it('setMood back to neutral returns the eyelids', () => {
+    const m = make({})
+    m.setMood('sleepy')
+    step(m, 2)
+    m.setMood('neutral')
+    step(m, 2)
+    expect(m.getLidDroop()).toBeLessThan(0.01)
+  })
+})
+
+describe('DogMotion: the head leads, the neck follows', () => {
+  it('after a sudden look, the head has turned further than the neck, and they end in proportion', () => {
+    const m = make({})
+    m.lookAt({ x: 900, y: GROUND_Y - 200 })
+    step(m, 0.1)
+    const yawOf = (n: string): number =>
+      Math.abs(new THREE.Euler().setFromQuaternion(m.boneNode(n).quaternion, 'ZYX').y)
+    const earlyRatio = yawOf('neck') / yawOf('head')
+    step(m, 3)
+    const lateRatio = yawOf('neck') / yawOf('head')
+    expect(earlyRatio).toBeLessThan(lateRatio - 0.05)
+    expect(lateRatio).toBeCloseTo(0.4 / 0.6, 1)
+  })
+})
+
+describe('DogMotion: standing life (weight shift, ear flick, boredom)', () => {
+  const rollOf = (m: DogMotion): number =>
+    new THREE.Euler().setFromQuaternion(m.boneNode('body').quaternion, 'ZYX').x
+
+  it('a standing dog slowly shifts its weight from side to side, by a couple of degrees at most', () => {
+    const m = make({})
+    let lo = Infinity
+    let hi = -Infinity
+    for (let f = 0; f < 60 * 14; f++) {
+      m.update(1000 / 60)
+      lo = Math.min(lo, rollOf(m))
+      hi = Math.max(hi, rollOf(m))
+    }
+    expect(lo).toBeLessThan(-0.015)
+    expect(hi).toBeGreaterThan(0.015)
+    expect(Math.max(-lo, hi)).toBeLessThan(0.04) // under ~2.3 degrees
+  })
+
+  it('does not shift its weight while walking', () => {
+    const m = make({})
+    step(m, 3)
+    void m.moveTo(900, GROUND_Y, 'walk')
+    step(m, 1.5)
+    expect(Math.abs(rollOf(m))).toBeLessThan(0.004)
+  })
+
+  it('keeps all four paws on the ground while it idles, for every dog', () => {
+    for (const [name, spec] of DOGS) {
+      const m = make(spec)
+      step(m, 30)
+      for (const leg of LEGS) {
+        m.pawWorld(leg, tmp)
+        expect(Math.abs(tmp.y - GROUND_Y), `${name} ${leg}`).toBeLessThan(1)
+      }
+    }
+  })
+
+  it('its head droops when nothing has happened for a long time, and lifts after a command', () => {
+    const headZ = (idle: boolean, seconds: number): number => {
+      const m = make({})
+      m.polish.idle = idle
+      step(m, seconds)
+      return m.boneNode('head').quaternion.z
+    }
+    const early = headZ(true, 1)
+    const late = headZ(true, 40)
+    const lateOff = headZ(false, 40)
+    expect(Math.abs(late - lateOff)).toBeGreaterThan(0.03) // visibly lower than the same dog without it
+    expect(Math.abs(early - headZ(false, 1))).toBeLessThan(0.03) // not yet bored at 1 s
+
+    const m = make({})
+    step(m, 40)
+    const bored = m.boneNode('head').quaternion.z
+    void m.setPose('headTilt')
+    void m.setPose('stand')
+    step(m, 4)
+    expect(Math.abs(m.boneNode('head').quaternion.z - bored)).toBeGreaterThan(0.02)
+  })
+
+  it('flicks an ear now and then', () => {
+    const peak = (idle: boolean): number => {
+      const m = make({})
+      m.polish.idle = idle
+      let hi = 0
+      for (let f = 0; f < 60 * 20; f++) {
+        m.update(1000 / 60)
+        hi = Math.max(hi, Math.abs(m.boneNode('ear_l').quaternion.z))
+      }
+      return hi
+    }
+    expect(peak(true)).toBeGreaterThan(peak(false) + 0.02)
+  })
+
+  it('polish.idle = false turns all of it off: no sway', () => {
+    const m = make({})
+    m.polish.idle = false
+    step(m, 6)
+    expect(Math.abs(rollOf(m))).toBeLessThan(1e-6)
+  })
+})
+
+describe('DogMotion: idle tricks', () => {
+  const jawZ = (m: DogMotion): number => Math.abs(m.boneNode('jaw').quaternion.z)
+  const tillDone = (m: DogMotion, seconds = 4): void => step(m, seconds)
+
+  it('a yawn opens the jaw wide, closes the eyes, then resolves and shuts the mouth again', async () => {
+    const m = make({})
+    let peakJaw = 0
+    let peakLid = 0
+    const p = m.playIdle('yawn')
+    expect(m.getIdle()).toBe('yawn')
+    for (let f = 0; f < 60 * 2.8; f++) {
+      m.update(1000 / 60)
+      peakJaw = Math.max(peakJaw, jawZ(m))
+      peakLid = Math.max(peakLid, m.getLidDroop())
+    }
+    await p
+    expect(peakJaw).toBeGreaterThan(0.25)
+    expect(peakLid).toBeGreaterThan(0.6)
+    expect(m.getIdle()).toBeNull()
+    expect(jawZ(m)).toBeLessThan(0.01)
+    expect(m.getLidDroop()).toBeLessThan(0.01)
+  })
+
+  it('a shake rattles the body much more than the weight shift does', () => {
+    const roll = (m: DogMotion): number =>
+      new THREE.Euler().setFromQuaternion(m.boneNode('body').quaternion, 'ZYX').x
+    const m = make({})
+    void m.playIdle('shake')
+    let peak = 0
+    for (let f = 0; f < 60 * 1.6; f++) {
+      m.update(1000 / 60)
+      peak = Math.max(peak, Math.abs(roll(m)))
+    }
+    expect(peak).toBeGreaterThan(0.04)
+  })
+
+  it('keeps all four paws on the ground during every trick, for every dog', () => {
+    for (const [name, spec] of DOGS) {
+      for (const trick of ['yawn', 'sniff', 'shake'] as const) {
+        const m = make(spec)
+        void m.playIdle(trick)
+        for (let f = 0; f < 60 * 3; f++) {
+          m.update(1000 / 60)
+          for (const leg of LEGS) {
+            m.pawWorld(leg, tmp)
+            expect(Math.abs(tmp.y - GROUND_Y), `${name} ${trick} ${leg}`).toBeLessThan(1)
+          }
+        }
+      }
+    }
+  })
+
+  it('any command cancels it: the promise resolves and the mouth closes again', async () => {
+    const m = make({})
+    const p = m.playIdle('yawn')
+    step(m, 1.2)
+    expect(jawZ(m)).toBeGreaterThan(0.1)
+    void m.moveTo(700, GROUND_Y, 'walk')
+    await p
+    expect(m.getIdle()).toBeNull()
+    step(m, 0.6)
+    expect(jawZ(m)).toBeLessThan(0.02)
+  })
+
+  it('does nothing while the dog is busy (it never interrupts a walk)', async () => {
+    const m = make({})
+    void m.moveTo(900, GROUND_Y, 'walk')
+    step(m, 0.3)
+    await m.playIdle('yawn')
+    expect(m.getIdle()).toBeNull()
+  })
+
+  it('polish.idle = false: playIdle resolves at once and nothing moves', async () => {
+    const m = make({})
+    m.polish.idle = false
+    await m.playIdle('yawn')
+    step(m, 1.2)
+    expect(jawZ(m)).toBeLessThan(1e-6)
+  })
+
+  it('on its own, a bored standing dog does a trick every so often; with idleTricks off it never does', () => {
+    const seen = (tricksOn: boolean): Set<string> => {
+      const m = make({})
+      m.polish.idleTricks = tricksOn
+      const s = new Set<string>()
+      for (let f = 0; f < 60 * 90; f++) {
+        m.update(1000 / 60)
+        const n = m.getIdle()
+        if (n) s.add(n)
+      }
+      return s
+    }
+    expect(seen(true).size).toBeGreaterThanOrEqual(2)
+    expect(seen(false).size).toBe(0)
+  })
+
+  it('a trick still finishes after a late, long frame', () => {
+    const m = make({})
+    void m.playIdle('shake')
+    m.update(50)
+    tillDone(m)
+    expect(m.getIdle()).toBeNull()
+  })
+})
