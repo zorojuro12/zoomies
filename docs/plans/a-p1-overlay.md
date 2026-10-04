@@ -218,34 +218,35 @@
 
 **Checkpoint 1: typing rate and backspace ratio**
 
-- [ ] **Step 1: Write failing tests** — Spec: (a) 10 keys at t = 0, 100, …, 900, none backspace → `typing(1000)` = `{keysPerSec: 5, backspaceRatio: 0}`; (b) same keys, `typing(3000)` → `{0, 0}` (all older than 2 s); (c) 10 keys of which 2 backspace → `backspaceRatio` 0.2; (d) no keys → `backspaceRatio` 0 (not `NaN`); (e) 600 keys within 1 s (beyond the 512 buffer) → no throw, `keysPerSec` = 256 (512 kept ÷ 2 s).
-- [ ] **Step 2: Run** — `npx vitest run src/main/os/activity-tracker.test.ts` → FAIL (module not found).
-- [ ] **Step 3: Implement** `key` and `typing`.
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Commit** — `npx vitest run src/main/os/activity-tracker.test.ts && git add app/src/main/os/activity-tracker.ts app/src/main/os/activity-tracker.test.ts && git commit -m "feat: activity tracker - typing rate and backspace ratio (timing only)"`
+- [x] **Step 1: Write failing tests** — Spec: (a) 10 keys at t = 0, 100, …, 900, none backspace → `typing(1000)` = `{keysPerSec: 5, backspaceRatio: 0}`; (b) same keys, `typing(3000)` → `{0, 0}` (all older than 2 s); (c) 10 keys of which 2 backspace → `backspaceRatio` 0.2; (d) no keys → `backspaceRatio` 0 (not `NaN`); (e) 600 keys within 1 s (beyond the 512 buffer) → no throw, `keysPerSec` = 256 (512 kept ÷ 2 s).
+- [x] **Step 2: Run** — `npx vitest run src/main/os/activity-tracker.test.ts` → FAIL (module not found).
+- [x] **Step 3: Implement** `key` and `typing`.
+- [x] **Step 4: Run** → PASS.
+- [x] **Step 5: Commit** — `npx vitest run src/main/os/activity-tracker.test.ts && git add app/src/main/os/activity-tracker.ts app/src/main/os/activity-tracker.test.ts && git commit -m "feat: activity tracker - typing rate and backspace ratio (timing only)"` → `541718b`
 
 **Checkpoint 2: mouse speed**
 
-- [ ] **Step 1: Write failing tests** — Spec: (a) `mouse(0, 0, 0)`, `mouse(100, 100, 0)` → `mouseSpeed(100)` = 1000; (b) `mouse(0,0,0)`, `mouse(50,30,40)`, `mouse(100,30,80)` → path 50 + 40 = 90 px over 0.1 s → 900; (c) samples at t 0 and 100, `mouseSpeed(600)` → 0 (outside the 250 ms window); (d) a single sample → 0.
-- [ ] **Step 2: Run** → FAIL (`mouse`/`mouseSpeed` missing).
-- [ ] **Step 3: Implement** `mouse`, `mouseSpeed`.
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Commit** — `npx vitest run src/main/os/activity-tracker.test.ts && git add app/src/main/os/activity-tracker.ts app/src/main/os/activity-tracker.test.ts && git commit -m "feat: activity tracker - mouse speed"`
+- [x] **Step 1: Write failing tests** — Spec: (a) `mouse(0, 0, 0)`, `mouse(100, 100, 0)` → `mouseSpeed(100)` = 1000; (b) `mouse(0,0,0)`, `mouse(50,30,40)`, `mouse(100,30,80)` → path 50 + 40 = 90 px over 0.1 s → 900; (c) samples at t 0 and 100, `mouseSpeed(600)` → 0 (outside the 250 ms window); (d) a single sample → 0.
+- [x] **Step 2: Run** → FAIL (`mouse`/`mouseSpeed` missing).
+- [x] **Step 3: Implement** `mouse`, `mouseSpeed`.
+- [x] **Step 4: Run** → PASS.
+- [x] **Step 5: Commit** — `npx vitest run src/main/os/activity-tracker.test.ts && git add app/src/main/os/activity-tracker.ts app/src/main/os/activity-tracker.test.ts && git commit -m "feat: activity tracker - mouse speed"` → `8893233`
 
 **Checkpoint 3: event emission on tick**
 
-- [ ] **Step 1: Write failing tests** — Spec (ticks every 100 ms from t = 0): (a) a key at t = 0; ticks 100…1000 → `typing` events at t = 500 and t = 1000 only (`keysPerSec` 0.5); at t = 2000 the key falls out of the window (it counts only while `t > tMs − 2000`), so the tick at t = 2000 emits one `typing` with `keysPerSec: 0`, and ticks 2100…3000 emit no `typing` event; (b) `idle` events at t = 1000, 2000, 3000 carrying the `idleSeconds` passed in; (c) mouse samples every 10 ms from t = 0 to 300 → `mouse` events at ≤ every 100 ms, the last one has the last x, y; no mouse samples → no `mouse` events.
-- [ ] **Step 2: Run** → FAIL (`tick` missing).
-- [ ] **Step 3: Implement** `tick`.
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Commit** — `npx vitest run src/main/os/activity-tracker.test.ts && git add app/src/main/os/activity-tracker.ts app/src/main/os/activity-tracker.test.ts && git commit -m "feat: activity tracker - throttled typing, mouse and idle events"`
+- [x] **Step 1: Write failing tests** — Spec (ticks every 100 ms from t = 0): (a) a key at t = 0; ticks 100…1000 → `typing` events at t = 500 and t = 1000 only (`keysPerSec` 0.5); at t = 2000 the key falls out of the window (it counts only while `t > tMs − 2000`), so the tick at t = 2000 emits one `typing` with `keysPerSec: 0`, and ticks 2100…3000 emit no `typing` event; (b) `idle` events at t = 1000, 2000, 3000 carrying the `idleSeconds` passed in; (c) mouse samples every 10 ms from t = 0 to 300 → `mouse` events at ≤ every 100 ms, the last one has the last x, y; no mouse samples → no `mouse` events.
+- [x] **Step 2: Run** → FAIL (`tick` missing).
+- [x] **Step 3: Implement** `tick`. **Note not covered by the Interfaces spec:** all three throttles (typing/mouse/idle) must baseline on the *first* `tick()` call's `tMs`, not `-Infinity` — otherwise the very first qualifying tick fires immediately instead of waiting out its interval (breaks the "events at 500 and 1000, not 100" requirement).
+- [x] **Step 4: Run** → PASS, 13 tests.
+- [x] **Step 5: Commit** — `npx vitest run src/main/os/activity-tracker.test.ts && git add app/src/main/os/activity-tracker.ts app/src/main/os/activity-tracker.test.ts && git commit -m "feat: activity tracker - throttled typing, mouse and idle events"` → `ac18a77`
 
 **Checkpoint 4 (manual): hooks on Windows**
 
-- [ ] **Step 1: Implement** — `npm install uiohook-napi`, `activity-hooks.ts`, wiring per Interfaces; HUD `activity` field.
-- [ ] **Step 2: Verify by hand** — Where: Windows demo laptop. Steps: `npm run dev`; type steadily in Notepad (another app has focus), mash Backspace, move the mouse fast, then leave the PC for 10 s.
+- [x] **Step 1: Implement** — `npm install uiohook-napi`, `activity-hooks.ts`, wiring per Interfaces; HUD `activity` field.
+- [x] **Step 2: Verify by hand** — Where: Windows demo laptop. Steps: `npm run dev`; type steadily in Notepad (another app has focus), mash Backspace, move the mouse fast, then leave the PC for 10 s.
   Expected: HUD kps rises while typing in **another app** and returns to 0 ~2 s after you stop; `bs` rises when mashing Backspace; mouse px/s rises with fast moves; idle counts up while untouched and resets on input; the terminal never prints any key or key code. Then simulate the fallback once: temporarily rename `node_modules/uiohook-napi` → app still starts, logs the "uiohook unavailable" line once, mouse speed still works; rename it back.
-- [ ] **Step 3: Commit** — `git add app/package.json app/package-lock.json app/src/main/os/activity-hooks.ts app/src/main/os/windows-os-layer.ts app/src/main/index.ts app/src/renderer/main.ts && git commit -m "feat: global typing/mouse/idle activity via uiohook (timing only)"` — tell the group chat: "`uiohook-napi` added, run `npm install`".
+  **Result (2026-10-04):** all confirmed — kps/bs/mouse px/s/idle all behaved as expected (bs correctly maxes to 1.0 when only Backspace is pressed — 100% of keys in the window are backspaces). Fallback simulation: with `uiohook-napi` renamed away, app started cleanly, logged the unavailable line exactly once, mouse speed kept working via cursor polling. Restored afterward.
+- [x] **Step 3: Commit** — `git add app/package.json app/package-lock.json app/src/main/os/activity-hooks.ts app/src/main/os/windows-os-layer.ts app/src/main/index.ts app/src/renderer/main.ts && git commit -m "feat: global typing/mouse/idle activity via uiohook (timing only)"` → `bb2600e` — **still pending:** tell the group chat "`uiohook-napi` added, run `npm install`".
 
 ---
 
