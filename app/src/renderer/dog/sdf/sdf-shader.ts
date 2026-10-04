@@ -5,7 +5,7 @@
 // from the dog?", step forward by that distance, repeat until we touch the surface or give up.
 // All shapes are blended with a smooth-min so they melt together like clay.
 
-export const MAX_SHAPES = 32
+export const MAX_SHAPES = 40
 
 export const SDF_VERT = /* glsl */ `
 varying vec3 vWorld;
