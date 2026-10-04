@@ -78,7 +78,7 @@ zoomies/
 │  │  ├─ dog/                    # SDF body, splat coat, skeleton, poses, gait       → Lane B
 │  │  ├─ world/                  # SDF colliders, ball, bounce prediction            → Lane A
 │  │  ├─ behaviour/              # needs model, state machine, steering              → Lane A
-│  │  ├─ audio/                  # Web Audio playback + panning                      → Lane A
+│  │  ├─ audio/                  # Web Audio playback + panning                      → Lane C
 │  │  └─ ui/                     # overlay, FPS meter, pose/shape editor, x-ray      → Lane B (editor) / A (overlay)
 │  └─ src/shared/                # CONTRACTS: types, events, dog-file schema         → everyone, change via PR only
 ├─ pipeline/                     # Python build-time reconstruction                  → Lane B
@@ -90,9 +90,9 @@ zoomies/
 
 | Lane | Owner | Claude workflow | Owns | Machine |
 |---|---|---|---|---|
-| **A — Desktop shell, world & integration** | Lead | Lead's workflow (this repo's `.claude/`) | Electron window, click-through, OS layer (Windows + stub), IPC, serial code, ball physics + fetch, needs model + behaviours, audio playback, ElevenLabs/Gemini runtime (L2, G2, G3), Tiger Data. **Integrator:** merges into `dev`, promotes to `main`, runs the demo laptop | Windows |
+| **A — Desktop shell, world & integration** | Lead | Lead's workflow (this repo's `.claude/`) | Electron window, click-through, OS layer (Windows + stub), IPC, serial code, ball physics + fetch, needs model + behaviours, ElevenLabs/Gemini runtime (L2, G2, G3), Tiger Data. **Integrator:** merges into `dev`, promotes to `main`, runs the demo laptop | Windows |
 | **B — The dog** | Teammate 2 | Their own workflow (personal `~/.claude/`), repo conventions apply | Pipeline code (cut-out → landmarks → fit → colours), SDF body + splat coat rendering, skeleton/poses/gait, pose & shape editor | Mac |
-| **C — Content, hardware & demo** | Teammate 3 | Lead's workflow (this repo's `.claude/`), learning as they go | Gemini side/back views + landmarks (AI Studio web UI, hour 0), ElevenLabs sound library (web UI + small script), Arduino sketch + breadboard wiring, likeness/pose tuning in the editor, QA on the demo path, demo video, Devpost write-up, pitch | Mac |
+| **C — Content, hardware & demo** | Teammate 3 | Lead's workflow (this repo's `.claude/`), learning as they go | Gemini side/back views + landmarks (AI Studio web UI, hour 0), ElevenLabs sound library (web UI + small script), audio playback module (Web Audio + panning), Arduino sketch + breadboard wiring, likeness/pose tuning in the editor, QA on the demo path, demo video, Devpost write-up, pitch | Mac |
 
 If Lane A falls behind, the services work (L2, G2, G3) is the first thing handed to Lane B once the dog is stable.
 
@@ -174,8 +174,8 @@ dev      ●──●──●──●──●──●──●──●─�
           a/*  b/*  c/*   a/*   b/*                    short-lived task branches, cut from dev
 ```
 - **Branch off `dev`**, named `<lane>/<task>`: `a/click-through`, `b/sdf-body`, `c/arduino-sketch`.
-- **PR into `dev`**, squash-merged. Commit count inside a branch doesn't matter; one squashed commit per PR keeps `dev` readable and easy to revert. Self-merge once it builds and someone glanced at it (or a quick `/code-review`).
-- **Keep branches short — merge into `dev` every 2–3 hours at most.** Before opening a PR, update from `dev` (`git pull --rebase origin dev`).
+- **PR into `dev` with a merge commit** (no squash, no rebase-merge). Branch history is preserved and each PR is one merge commit on `dev`, so a whole PR can still be reverted with `git revert -m 1 <merge>`. Self-merge once it builds and someone glanced at it (or a quick `/code-review`). In GitHub settings, allow merge commits only.
+- **Keep branches short — merge into `dev` every 2–3 hours at most.** Before opening a PR, merge the latest `dev` into your branch (`git fetch && git merge origin/dev`). Don't rebase branches others may have pulled.
 - **Promote `dev` → `main` only at checkpoints** (§5.3), after the lead runs the demo path on the Windows laptop. Tag each promotion (`mvp`, `demo-h14`, …). `main` is what goes on stage and what Devpost links to.
 - **Protect both `dev` and `main`** on GitHub: PRs only, no force-push. Only the lead promotes to `main`.
 - **Hotfix during the demo window:** branch from `main`, fix, PR into `main`, then merge `main` back into `dev`.
