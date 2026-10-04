@@ -90,6 +90,19 @@ async function start(): Promise<void> {
     const s = dog.getState()
     void dog.jumpTo(s.x + 160 * s.facing, groundY(), { apexPx: 120 })
   })
+  // Moods (the dog's feeling) and the polish switch (?polish=0 starts with the plain motion).
+  if (dog instanceof SdfDog) {
+    dog.setPolish(params.get('polish') !== '0')
+    let polishOn = params.get('polish') !== '0'
+    for (const mood of ['happy', 'curious', 'sleepy', 'alert', 'neutral'] as const) {
+      button(`mood: ${mood}`, () => dog.setMood(mood))
+    }
+    button('polish: on/off', () => {
+      polishOn = !polishOn
+      dog.setPolish(polishOn)
+      status.textContent = `polish ${polishOn ? 'on' : 'off'}`
+    })
+  }
   let ball = false
   button('ball', () => dog.attachBall((ball = !ball)))
   // X-ray views of the SDF dog: the raw shapes, the skeleton, and back to normal.

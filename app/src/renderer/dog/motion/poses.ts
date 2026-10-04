@@ -84,6 +84,8 @@ export const POSES: Record<string, PoseParams> = {
     neck: -6,
     tailBase: 20
   }),
+  // Crouch before a jump: sink down and lean the nose a little, like a spring being compressed.
+  crouch: pose({ drop: 0.3, pitch: -6, neck: 6, head: 4, tailBase: 12 }),
   jumpDown: pose({ drop: -0.04, pitch: -8, ffx: 0.3, ffl: 0.35, rfx: -0.2, rfl: 0.25, neck: 6 }),
   land: pose({ drop: 0.24, pitch: 4, ffx: 0.08, rfx: -0.05, neck: 8 })
 }
