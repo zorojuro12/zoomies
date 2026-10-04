@@ -1,7 +1,8 @@
 // Yaw = how far the dog is turned about its vertical axis (three.js rotation.y, radians).
 //   0°   facing screen-right (side-on)        90°  facing up the screen (back to the viewer)
 //   180° facing screen-left                  -90°  facing down the screen (face to the viewer)
-// Sideways travel also leans 25° toward the viewer (the three-quarter view); vertical travel doesn't.
+// Sideways travel leans 25° toward the viewer; standing still turns further, 60°, so the dog faces
+// us; vertical travel doesn't lean.
 // Expected angles are hand-worked (see comments), not recomputed from the implementation.
 import { describe, expect, it } from 'vitest'
 import { restYaw, stepAngle, targetYaw } from './yaw'
@@ -39,9 +40,20 @@ describe('targetYaw (screen velocity -> yaw)', () => {
 })
 
 describe('restYaw (standing still)', () => {
-  it('faces the last horizontal direction in three-quarter view', () => {
-    expect(diffDeg(restYaw(1), deg(-25))).toBeCloseTo(0, 1)
-    expect(diffDeg(restYaw(-1), deg(-155))).toBeCloseTo(0, 1)
+  it('turns well toward the viewer: 60° from side-on, face and chest toward us, not in profile', () => {
+    expect(diffDeg(restYaw(1), deg(-60))).toBeCloseTo(0, 1)
+    expect(diffDeg(restYaw(-1), deg(-120))).toBeCloseTo(0, 1) // the mirror image
+  })
+  it('still favours the side it was last facing (right stays in the right half, left in the left)', () => {
+    expect(Math.cos(restYaw(1))).toBeGreaterThan(0)
+    expect(Math.cos(restYaw(-1))).toBeLessThan(0)
+  })
+  it('leans toward the viewer (never away): the forward vector points toward +z', () => {
+    expect(-Math.sin(restYaw(1))).toBeGreaterThan(0.8)
+    expect(-Math.sin(restYaw(-1))).toBeGreaterThan(0.8)
+  })
+  it('is turned further toward the viewer than the walking lean is', () => {
+    expect(-Math.sin(restYaw(1))).toBeGreaterThan(-Math.sin(targetYaw(100, 0)))
   })
 })
 
