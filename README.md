@@ -6,6 +6,7 @@ company while you work, and plays joystick-launched fetch across your screen.
 
 StormHacks 2026 · Huawei Challenge #2 "Fetching Reality" · Ansh, Daniel, Abel
 
+- **New to the repo? Start with [`GETTING_STARTED.md`](GETTING_STARTED.md).**
 - What we're building: [`docs/specs/2026-10-03-zoomies-prd.md`](docs/specs/2026-10-03-zoomies-prd.md)
 - Stack and team workflow: [`docs/tech-stack.md`](docs/tech-stack.md)
 - Plans: [`docs/plans/`](docs/plans/) · Session journal: [`journal/`](journal/)
