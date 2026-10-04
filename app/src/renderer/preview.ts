@@ -132,6 +132,9 @@ async function start(): Promise<void> {
   // ?fetch=1: the fetch demo. A floor, a ball you can drag back and let go (the slingshot), and
   // the dog fetches it (P2 Task 3). Works here on a Mac, no overlay needed.
   let tickFetch: ((dtMs: number) => void) | null = null
+  // The fetch demo starts with the dog at the right side of the screen (its default spot).
+  const DOG_HOME = 0.85
+  const BALL_HOME = 0.6
   let fetchState = ''
   if (params.get('fetch') === '1') {
     const world = new World()
@@ -139,13 +142,16 @@ async function start(): Promise<void> {
     world.setBounds(workArea)
     const worldView = new WorldView(ctx.scene)
     worldView.setDebug(true) // outlines of the floor and the shelf
-    const ball = createBall(window.innerWidth * 0.7, groundY() - 10)
+    dog.placeAt(window.innerWidth * DOG_HOME, groundY())
+    // placeAt leaves it facing right (toward the screen edge): a 3 px step left turns it to face the room
+    void dog.moveTo(window.innerWidth * DOG_HOME - 3, groundY(), 'walk')
+    const ball = createBall(window.innerWidth * BALL_HOME, groundY() - 10)
     ball.resting = true
     const hiddenBall: Ball = { ...ball, r: 0 }
     const fetch = new Fetch({ dog, ball, world, groundY })
     fetch.onNote((n) => console.log('[fetch]', n))
     const shelf = {
-      x: window.innerWidth * 0.55,
+      x: window.innerWidth * 0.2,
       y: groundY() - 170,
       w: window.innerWidth * 0.25,
       h: 24
@@ -201,7 +207,7 @@ async function start(): Promise<void> {
     button('cancel fetch', () => fetch.cancel())
     button('reset ball', () => {
       fetch.cancel()
-      ball.x = window.innerWidth * 0.7
+      ball.x = window.innerWidth * BALL_HOME
       ball.y = groundY() - 10
       ball.vx = 0
       ball.vy = 0
