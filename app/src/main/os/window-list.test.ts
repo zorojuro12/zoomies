@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest'
+import { toWindowRects, type RawWindow } from './window-list'
+
+const display = { x: 0, y: 0, w: 1920, h: 1080 }
+const identity = (r: { x: number; y: number; w: number; h: number }): typeof r => r
+
+function raw(overrides: Partial<RawWindow> & { id: string; title: string }): RawWindow {
+  return {
+    visible: true,
+    minimized: false,
+    cloaked: false,
+    toolWindow: false,
+    rect: { x: 100, y: 100, w: 200, h: 200 },
+    ...overrides
+  }
+}
+
+describe('toWindowRects', () => {
+  it('filters out self, hidden, minimized, cloaked, tool, titleless, shell, tiny and off-screen windows, keeping z-order', () => {
+    const input: RawWindow[] = [
+      raw({ id: '1', title: 'Self' }),
+      raw({ id: '2', title: 'Notepad', rect: { x: 10.4, y: 20.6, w: 300.2, h: 200.5 } }),
+      raw({ id: '3', title: 'Hidden', visible: false }),
+      raw({ id: '4', title: 'Min', minimized: true }),
+      raw({ id: '5', title: 'Cloaked', cloaked: true }),
+      raw({ id: '6', title: 'Tool', toolWindow: true }),
+      raw({ id: '7', title: '' }),
+      raw({ id: '8', title: 'Program Manager' }),
+      raw({ id: '9', title: 'Tiny', rect: { x: 500, y: 500, w: 40, h: 40 } }),
+      raw({ id: '10', title: 'OffScreen', rect: { x: 2000, y: 100, w: 300, h: 200 } }),
+      raw({ id: '11', title: 'Chrome', rect: { x: 400, y: 300, w: 500, h: 400 } })
+    ]
+
+    const result = toWindowRects(input, { selfIds: new Set(['1']), display, toDip: identity })
+
+    expect(result).toEqual([
+      { id: '2', title: 'Notepad', x: 10, y: 21, w: 300, h: 201, z: 0, minimized: false },
+      { id: '11', title: 'Chrome', x: 400, y: 300, w: 500, h: 400, z: 1, minimized: false }
+    ])
+  })
+})
