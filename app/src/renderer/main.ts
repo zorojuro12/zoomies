@@ -8,6 +8,7 @@ import { FrameStats } from './host/frame-stats'
 import { Hud } from './host/hud'
 import { createRenderContext } from './host/scene'
 import { createBall, stepBall } from './world/ball'
+import { aimFromDrag, ballHit, launchVelocity } from './world/slingshot'
 import { World, worldSolids } from './world/world-sdf'
 import { WorldView } from './world/world-view'
 
@@ -88,6 +89,32 @@ async function start(): Promise<void> {
 
   const ball = createBall(window.innerWidth / 2, groundY() - 200)
 
+  // Slingshot (Task 8): grab the ball, drag away from it to aim (the ball itself stays put, like
+  // a slingshot pouch — only the aim line reacts), release to launch opposite the pull.
+  let dragging = false
+  let currentAim: { angle: number; power: number } | null = null
+  window.addEventListener('pointerdown', (e) => {
+    if (!ballHit(ball, e.clientX, e.clientY)) return
+    dragging = true
+    ball.held = true
+    ball.resting = false
+    ball.vx = 0
+    ball.vy = 0
+  })
+  window.addEventListener('pointermove', (e) => {
+    if (!dragging) return
+    currentAim = aimFromDrag(ball.x, ball.y, e.clientX, e.clientY)
+    worldView.setAim(ball, currentAim)
+  })
+  window.addEventListener('pointerup', () => {
+    if (!dragging) return
+    dragging = false
+    if (currentAim !== null) launchVelocity(currentAim.angle, currentAim.power, ball)
+    ball.held = false
+    currentAim = null
+    worldView.setAim(ball, null)
+  })
+
   window.addEventListener('mousemove', (e) => dog.lookAt({ x: e.clientX, y: e.clientY }))
   if (!overlay) {
     window.addEventListener('click', (e) => {
@@ -95,11 +122,13 @@ async function start(): Promise<void> {
     })
   } else {
     // The overlay starts click-through (main process ignores mouse events, forwarding them
-    // through); this gate flips it off only while the cursor is over the dog, with a hold so
-    // crossing the dog's edge doesn't flicker click-through state every frame.
+    // through); this gate flips it off while the cursor is over the dog or the ball, or while
+    // dragging (so a drag that moves the cursor away from the ball's fixed position doesn't lose
+    // the pointerup that ends it).
     const gate = new ClickThroughGate()
     window.addEventListener('mousemove', (e) => {
-      const overInteractive = dog.hitTest(e.clientX, e.clientY)
+      const overInteractive =
+        dog.hitTest(e.clientX, e.clientY) || ballHit(ball, e.clientX, e.clientY) || dragging
       const next = gate.update(performance.now(), overInteractive)
       if (next !== null) window.zoomies.setClickThrough(next === 'clickThrough')
     })
