@@ -1,5 +1,7 @@
 # Lane A P3 — Shoulds (serial controller, catch, terrain, voice) Implementation Plan
 
+> **Superseded (2026-10-04 ~09:50):** Daniel executed P3 from his own `docs/plans/a-p3-serial.md` (serial phases A–C, commands D1, Gemini D2, voice D3 — all merged). Use that plan and `lane-a-ansh.md` P3 for status; this file is kept for history only.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use the `executing-plans` skill to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** The judge drives the dog from Abel's Arduino controller (joystick throw, touch pet, button call/push-to-talk, buzzer squeak/chirp), the dog catches the ball mid-air, uses windows as terrain, and understands spoken commands.
