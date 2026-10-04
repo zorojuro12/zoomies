@@ -35,6 +35,11 @@ export class World {
     this.workArea = workArea
   }
 
+  /** The work area (the free region's outer edge; everything outside it counts as solid). */
+  getBounds(): Rect {
+    return this.workArea
+  }
+
   /** Copies the first `MAX_SOLIDS` into a Float64Array; the rest are ignored. */
   setSolids(solids: readonly Rect[]): void {
     const n = Math.min(solids.length, World.MAX_SOLIDS)
