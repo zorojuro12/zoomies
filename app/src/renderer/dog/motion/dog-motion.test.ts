@@ -406,3 +406,84 @@ describe('DogMotion: the head leads, the neck follows', () => {
     expect(lateRatio).toBeCloseTo(0.4 / 0.6, 1)
   })
 })
+
+describe('DogMotion: standing life (weight shift, ear flick, boredom)', () => {
+  const rollOf = (m: DogMotion): number =>
+    new THREE.Euler().setFromQuaternion(m.boneNode('body').quaternion, 'ZYX').x
+
+  it('a standing dog slowly shifts its weight from side to side, by a couple of degrees at most', () => {
+    const m = make({})
+    let lo = Infinity
+    let hi = -Infinity
+    for (let f = 0; f < 60 * 14; f++) {
+      m.update(1000 / 60)
+      lo = Math.min(lo, rollOf(m))
+      hi = Math.max(hi, rollOf(m))
+    }
+    expect(lo).toBeLessThan(-0.015)
+    expect(hi).toBeGreaterThan(0.015)
+    expect(Math.max(-lo, hi)).toBeLessThan(0.04) // under ~2.3 degrees
+  })
+
+  it('does not shift its weight while walking', () => {
+    const m = make({})
+    step(m, 3)
+    void m.moveTo(900, GROUND_Y, 'walk')
+    step(m, 1.5)
+    expect(Math.abs(rollOf(m))).toBeLessThan(0.004)
+  })
+
+  it('keeps all four paws on the ground while it idles, for every dog', () => {
+    for (const [name, spec] of DOGS) {
+      const m = make(spec)
+      step(m, 30)
+      for (const leg of LEGS) {
+        m.pawWorld(leg, tmp)
+        expect(Math.abs(tmp.y - GROUND_Y), `${name} ${leg}`).toBeLessThan(1)
+      }
+    }
+  })
+
+  it('its head droops when nothing has happened for a long time, and lifts after a command', () => {
+    const headZ = (idle: boolean, seconds: number): number => {
+      const m = make({})
+      m.polish.idle = idle
+      step(m, seconds)
+      return m.boneNode('head').quaternion.z
+    }
+    const early = headZ(true, 1)
+    const late = headZ(true, 40)
+    const lateOff = headZ(false, 40)
+    expect(Math.abs(late - lateOff)).toBeGreaterThan(0.03) // visibly lower than the same dog without it
+    expect(Math.abs(early - headZ(false, 1))).toBeLessThan(0.03) // not yet bored at 1 s
+
+    const m = make({})
+    step(m, 40)
+    const bored = m.boneNode('head').quaternion.z
+    void m.setPose('headTilt')
+    void m.setPose('stand')
+    step(m, 4)
+    expect(Math.abs(m.boneNode('head').quaternion.z - bored)).toBeGreaterThan(0.02)
+  })
+
+  it('flicks an ear now and then', () => {
+    const peak = (idle: boolean): number => {
+      const m = make({})
+      m.polish.idle = idle
+      let hi = 0
+      for (let f = 0; f < 60 * 20; f++) {
+        m.update(1000 / 60)
+        hi = Math.max(hi, Math.abs(m.boneNode('ear_l').quaternion.z))
+      }
+      return hi
+    }
+    expect(peak(true)).toBeGreaterThan(peak(false) + 0.02)
+  })
+
+  it('polish.idle = false turns all of it off: no sway', () => {
+    const m = make({})
+    m.polish.idle = false
+    step(m, 6)
+    expect(Math.abs(rollOf(m))).toBeLessThan(1e-6)
+  })
+})

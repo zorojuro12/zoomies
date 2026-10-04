@@ -20,6 +20,7 @@ import { footLift, footOffsetX, GAITS, legPhase, strideHz } from './gait'
 import type { GaitDef, LegId } from './gait'
 import { solveLegToGround } from './leg-solve'
 import type { LegGeometry } from './leg-solve'
+import { createIdleLife, noteActivity, stepIdleLife } from './idle-life'
 import { createMood, setMoodTarget, stepMood } from './mood'
 import type { MoodName } from './mood'
 import { blendPose, copyPose, POSES } from './poses'
@@ -87,7 +88,7 @@ export class DogMotion implements DogController {
   readonly root = new THREE.Group()
   readonly rig: DogRig
   /** Switches for the extra polish; set a flag to false to get the plain motion back. */
-  readonly polish = { anticipation: true, mood: true }
+  readonly polish = { anticipation: true, mood: true, idle: true }
 
   // geometry taken from the dog file
   private readonly legs: Leg[]
@@ -136,6 +137,7 @@ export class DogMotion implements DogController {
   private neckYaw = 0 // the neck follows the head a beat later
   private neckPitch = 0
   private readonly mood = createMood()
+  private readonly idle = createIdleLife(7)
   private readonly earSpring: SpringState = { x: 0, v: 0 }
   // per-leg paw targets for the current frame (reused every frame)
   private readonly footX = new Float64Array(4)
@@ -238,6 +240,7 @@ export class DogMotion implements DogController {
 
   setPose(pose: PoseName, opts?: { durationMs?: number }): Promise<void> {
     if (!PUBLIC_POSES.has(pose)) return Promise.resolve()
+    noteActivity(this.idle)
     this.finishPendingPose()
     this.standTimer = 0
     this.publicPose = pose
@@ -249,6 +252,7 @@ export class DogMotion implements DogController {
   }
 
   moveTo(x: number, y: number, gait: Gait): Promise<void> {
+    noteActivity(this.idle)
     this.finishMotion()
     this.gait = GAITS[gait]
     if (this.publicPose !== 'stand') void this.setPose('stand', { durationMs: 150 })
@@ -265,6 +269,7 @@ export class DogMotion implements DogController {
   }
 
   jumpTo(x: number, y: number, opts?: { apexPx?: number }): Promise<void> {
+    noteActivity(this.idle)
     this.finishMotion()
     const apex = opts?.apexPx ?? 80
     const peakY = Math.min(this.y, y) - apex
@@ -305,6 +310,7 @@ export class DogMotion implements DogController {
 
   /** Set the dog's feeling (happy, curious, sleepy, alert, neutral) at an intensity 0..1. */
   setMood(name: MoodName, intensity = 1): void {
+    noteActivity(this.idle)
     setMoodTarget(this.mood, this.polish.mood ? name : 'neutral', intensity)
   }
 
@@ -366,6 +372,12 @@ export class DogMotion implements DogController {
     this.clock += dt
     if (!this.polish.mood) setMoodTarget(this.mood, 'neutral', 0)
     stepMood(this.mood, dt)
+    const standing =
+      this.motion.kind === 'none' &&
+      this.publicPose === 'stand' &&
+      this.standTimer === 0 &&
+      this.poseT >= 1
+    stepIdleLife(this.idle, dt, this.polish.idle && standing)
     this.integrateMotion(dt)
     this.updatePoseBlend(dt)
     this.updateYaw(dt)
@@ -556,7 +568,7 @@ export class DogMotion implements DogController {
     }
     bodyY += excess
     rig.node('body').position.y = bodyY
-    rig.setBone('body', pitch)
+    rig.setBone('body', pitch, 0, this.idle.sway) // sway = the weight shift (a roll about the forward axis)
 
     // --- legs: IK aims each paw at its ground point ----------------------------------------------
     for (let i = 0; i < this.legs.length; i++) {
@@ -571,13 +583,14 @@ export class DogMotion implements DogController {
     const breathNeck = Math.sin(this.clock * 2.4) * 0.6 * DEG * breathing
     rig.setBone(
       'neck',
-      this.rest('neck') + ((cur.neck + mv.neck) * DEG + this.neckPitch * 0.4 + breathNeck),
+      this.rest('neck') +
+        ((cur.neck + mv.neck + this.idle.droop * 4) * DEG + this.neckPitch * 0.4 + breathNeck),
       this.neckYaw * 0.4
     )
     const jawWiggle = cur.jaw > 10 ? Math.sin(this.clock * 14) * 3 : 0
     rig.setBone(
       'head',
-      this.rest('head') + (cur.head + mv.head) * DEG + this.lookPitch * 0.6,
+      this.rest('head') + (cur.head + mv.head + this.idle.droop * 7) * DEG + this.lookPitch * 0.6,
       this.lookYaw * 0.6,
       (cur.headRoll + mv.roll) * DEG
     )
@@ -597,6 +610,7 @@ export class DogMotion implements DogController {
       const target =
         -(this.speed * 0.03 + vy * 0.02) * DEG -
         Math.max(-0.6, Math.min(1, this.earPerk + mv.ears)) * 12 * DEG
+      if (this.idle.earKick !== 0) this.earSpring.v -= 5 // a quick flick of the ears
       stepSpring(this.earSpring, Math.max(-0.6, Math.min(0.6, target)), 160, 11, dt)
     }
     this.prevBodyY = bodyY
