@@ -9,6 +9,8 @@ const inputs = []
 const statuses = []
 const buzzed = []
 let interpretAnswer = 'error'
+let stubNewDog = { ok: false, cancelled: true, message: 'cancelled' }
+const progressCbs = []
 let transcribeAnswer = ''
 contextBridge.exposeInMainWorld('zoomies', {
   getWindows: () => Promise.resolve([]),
@@ -29,6 +31,13 @@ contextBridge.exposeInMainWorld('zoomies', {
     return () => {}
   },
   getSerialStatus: () => Promise.resolve({ connected: false, port: null }),
+  newDog: () => Promise.resolve(stubNewDog),
+  savedDog: () => Promise.resolve(null),
+  resetDog: () => Promise.resolve(),
+  onNewDogProgress: (cb) => {
+    progressCbs.push(cb)
+    return () => {}
+  },
   transcribe: () => Promise.resolve(transcribeAnswer),
   interpret: () => Promise.resolve(interpretAnswer),
   buzz: (p) => {
@@ -38,6 +47,12 @@ contextBridge.exposeInMainWorld('zoomies', {
 })
 contextBridge.exposeInMainWorld('__stub', {
   buzzed: () => buzzed,
+  newDogResult: (r) => {
+    stubNewDog = r
+  },
+  newDogProgress: (p) => {
+    for (const cb of progressCbs) cb(p)
+  },
   heard: (t) => {
     transcribeAnswer = t
   },
