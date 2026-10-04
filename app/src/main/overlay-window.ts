@@ -12,6 +12,10 @@ function buildQuery(opts: { overlay: boolean; debug: boolean }): string {
   const params = new URLSearchParams()
   if (opts.overlay) params.set('overlay', '1')
   if (opts.debug) params.set('debug', '1')
+  // ZOOMIES_BEHAVIOUR=0 turns the dog's personality off (the host acts exactly like P1);
+  // ZOOMIES_DEMO=1 uses short timers (idle 8 s, asleep 20 s, break 90 s) so a demo can show sleep and wake.
+  if (process.env.ZOOMIES_BEHAVIOUR === '0') params.set('behaviour', '0')
+  if (process.env.ZOOMIES_DEMO === '1') params.set('demo', '1')
   return params.toString()
 }
 
