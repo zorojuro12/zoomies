@@ -17,10 +17,13 @@
 //            (so a 4 ms dog and a 15 ms dog stop looking identical). Use --zoom to change the dog's size.
 //   --wait   ms to wait after the last click before the shot (default 800)
 //   --zoom   page zoom factor, makes the small dog bigger (default 1)
+//   --stub   1 = run the real app host (index.html) with a fake window.zoomies; inject activity with
+//            --eval "window.__stub.emit({kind:'idle',seconds:25})"
 //   --size   WxH of the window in CSS px (default 900x600)
 //   --out    where to write the PNG (required)
 import { app, BrowserWindow } from 'electron'
 import { writeFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`)
@@ -34,6 +37,8 @@ const clicks = arg('click', '')
   .filter(Boolean)
 const evalJs = arg('eval', '')
 const bench = Number(arg('bench', '0'))
+// --stub 1: run the real app host (index.html) with a fake `window.zoomies` (no OS layer needed)
+const stub = arg('stub', '') === '1'
 const waitMs = Number(arg('wait', '800'))
 const zoom = Number(arg('zoom', '1'))
 const [width, height] = arg('size', '900x600').split('x').map(Number)
@@ -56,7 +61,10 @@ app.whenReady().then(async () => {
     width,
     height,
     show: false,
-    webPreferences: { backgroundThrottling: false }
+    webPreferences: {
+      backgroundThrottling: false,
+      ...(stub ? { preload: fileURLToPath(new URL('./zoomies-stub-preload.cjs', import.meta.url)) } : {})
+    }
   })
   win.webContents.on('console-message', (event) => {
     // Show page errors/warnings only (level: 'warning' | 'error').
