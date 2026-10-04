@@ -23,7 +23,9 @@ from . import spec_defs as sd
 from .aggregate import aggregate_specs
 from .colors import dominant_colors, snap_colors
 
-DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+# Verified against the live model list: "gemini-2.5-flash" is listed but 404s for new keys ("no longer
+# available to new users"); the API itself recommends gemini-3.8-flash.
+DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 
 _PROPORTION_HELP = {
     "bodyLength": "Torso length. 1.0 = typical; 0.7 = short and compact; 1.4 = long (dachshund-like).",
@@ -155,6 +157,7 @@ def photo_to_spec(
     calls: int = 3,
     timeout_s: float = 15.0,
     snap: bool = True,
+    snap_delta: float = 10.0,
     source_photo: str | None = None,
 ) -> SpecResult:
     """Photo -> robust spec. `ask(image_bytes, mime) -> dict` is the model call (injectable)."""
@@ -182,7 +185,9 @@ def photo_to_spec(
     if snap and answers:
         try:
             palette = dominant_colors(Image.open(path))
-            spec["colors"], report["snapped"] = snap_colors(spec["colors"], palette)
+            # Only TINY corrections: a real run showed Gemini's colours were already right, and a
+            # wide snap dulled the copper (the photo's small copper areas blend with black fur).
+            spec["colors"], report["snapped"] = snap_colors(spec["colors"], palette, max_delta=snap_delta)
             report["palette"] = palette
         except Exception as e:  # noqa: BLE001 - snapping is a refinement; never lose the spec over it
             report["errors"].append(f"colour snap skipped: {type(e).__name__}: {e}")
@@ -223,9 +228,10 @@ def main(argv=None) -> int:
     ap.add_argument("photo", help="path to the dog photo")
     ap.add_argument("--name", required=True, help="name of the spec, e.g. aussie-gemini")
     ap.add_argument("--out", help="where to write it (default: assets/dog/<name>.spec.json)")
-    ap.add_argument("--calls", type=int, default=3, help="parallel Gemini calls to take the median of")
+    ap.add_argument("--calls", type=int, default=5, help="parallel Gemini calls to take the median of")
     ap.add_argument("--timeout", type=float, default=15.0, help="seconds to wait for the calls")
     ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--snap-delta", type=float, default=10.0, help="largest colour change (CIE delta-E) the photo may make; 0 = never snap")
     ap.add_argument("--source-photo", help="path recorded in the spec, relative to assets/ (e.g. photo/dog.jpeg)")
     args = ap.parse_args(argv)
 
@@ -242,6 +248,8 @@ def main(argv=None) -> int:
         calls=args.calls,
         timeout_s=args.timeout,
         source_photo=args.source_photo,
+        snap=args.snap_delta > 0,
+        snap_delta=args.snap_delta,
     )
     out = Path(args.out) if args.out else repo_root / "assets" / "dog" / f"{args.name}.spec.json"
     out.write_text(json.dumps(_tidy(result.spec), indent=2) + "\n", encoding="utf-8")
