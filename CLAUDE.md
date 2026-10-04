@@ -50,8 +50,9 @@ When they disagree, the earlier one wins — and fix the later one.
 ## Build and test
 
 All commands run from `app/`. Verified in WSL (Linux) at scaffold time:
-`npm run typecheck`, `npm run lint`, `npm test`, `npm run build`. **`npm run dev`
-still needs its first run on Windows and on a Mac** — update this line once done.
+`npm run typecheck`, `npm run lint`, `npm test`, `npm run build`. `npm run dev`
+verified on **macOS** (Abel, 2026-10-03). **Windows still needs its first run** — update
+this line once done.
 
 | Command | Does |
 |---|---|
