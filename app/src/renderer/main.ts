@@ -1,23 +1,17 @@
-// App host (CP0): renders the placeholder dog in a normal window. Click to make it run there;
+// App host (CP0): renders our dog (the Aussie, via createDog) in a normal window. Click to make it run there;
 // it watches the cursor. Lane A turns this into the transparent overlay in P1.
 import { APP_NAME, FRAME_BUDGET_MS } from '@shared/app-info'
-import { ASSETS, assetUrl } from '@shared/assets'
-import type { DogFile } from '@shared/dog-file'
-import { validateDogFile } from '@shared/dog-file'
-import { PlaceholderDog } from './dog/placeholder/placeholder-dog'
-import { createRenderContext, loadJson } from './host/scene'
+import { createDog } from './dog/create-dog'
+import { createRenderContext } from './host/scene'
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement
 const status = document.getElementById('status') as HTMLDivElement
 
 async function start(): Promise<void> {
   const ctx = createRenderContext(canvas)
-  const dogFile = await loadJson<DogFile>(assetUrl(ASSETS.placeholderDog))
-  const errors = validateDogFile(dogFile)
-  if (errors.length > 0) throw new Error(`Invalid dog file: ${errors.join('; ')}`)
-
-  const dog = new PlaceholderDog()
-  await dog.init(ctx, dogFile)
+  // createDog never leaves the host without a dog: bad spec file -> default dog; SDF dog fails to
+  // start -> the placeholder (see dog/create-dog.ts).
+  const dog = await createDog(ctx)
   const groundY = (): number => window.innerHeight - 40
   dog.placeAt(window.innerWidth / 2, groundY())
 
