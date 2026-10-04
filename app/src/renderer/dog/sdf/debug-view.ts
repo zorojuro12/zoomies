@@ -2,7 +2,7 @@
 //   'shapes'    every SDF primitive drawn in its OWN flat colour, un-blended (the "clay balls" the
 //               dog is made of);
 //   'landmarks' the contract's slot for the fitted structure: here, the skeleton over the dog;
-//   'coat'      no splat coat yet, so it shows the normal dog.
+//   'coat'      the fur splats ONLY (the SDF body is hidden), to show the coat's structure.
 import type { DogDebugView } from '@shared/dog-view'
 
 export interface DebugFlags {
@@ -10,17 +10,20 @@ export interface DebugFlags {
   hardShapes: boolean
   /** Draw the skeleton (bones and joints) over the dog. */
   skeleton: boolean
+  /** Show only the fur splats: hide the SDF body. */
+  coatOnly: boolean
 }
 
 export function debugFlags(mode: DogDebugView): DebugFlags {
   switch (mode) {
     case 'shapes':
-      return { hardShapes: true, skeleton: false }
+      return { hardShapes: true, skeleton: false, coatOnly: false }
     case 'landmarks':
-      return { hardShapes: false, skeleton: true }
-    case 'normal':
+      return { hardShapes: false, skeleton: true, coatOnly: false }
     case 'coat':
-      return { hardShapes: false, skeleton: false }
+      return { hardShapes: false, skeleton: false, coatOnly: true }
+    case 'normal':
+      return { hardShapes: false, skeleton: false, coatOnly: false }
   }
 }
 
