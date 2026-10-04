@@ -1,0 +1,5 @@
+# Claude Code: keep local tooling out of the repo, except the shared journal skill
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/journal/
