@@ -92,6 +92,8 @@ export class SdfDog implements DogView, DogController {
     uPixel: { value: 1 }
   }
 
+  private readonly headScratch = new THREE.Vector3()
+
   private get m(): DogMotion {
     if (!this.motion) throw new Error('SdfDog used before init()')
     return this.motion
@@ -105,6 +107,25 @@ export class SdfDog implements DogView, DogController {
   /** Play an idle trick (yawn, sniff, shake) on the spot; does nothing if the dog is busy. */
   playIdle(name: IdleName): Promise<void> {
     return this.m.playIdle(name)
+  }
+
+  /** Where the dog's head is on screen (the pet hand goes there). */
+  headPosition(out: { x: number; y: number }): void {
+    this.m.boneWorld('head', this.headScratch)
+    out.x = this.headScratch.x
+    out.y = this.headScratch.y
+  }
+
+  /** Where the middle of the dog's body is on screen (the pet hand strokes it when the dog lies down). */
+  bodyPosition(out: { x: number; y: number }): void {
+    this.m.boneWorld('body', this.headScratch)
+    out.x = this.headScratch.x
+    out.y = this.headScratch.y
+  }
+
+  /** The dog's standing height in px. */
+  dogHeightPx(): number {
+    return this.m.getHeightPx()
   }
 
   /** Turn the extra motion polish on or off (anticipation before jumps, moods, standing life). */

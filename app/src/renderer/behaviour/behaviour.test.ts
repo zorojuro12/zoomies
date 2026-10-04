@@ -360,17 +360,30 @@ describe('the cursor', () => {
 })
 
 describe('petting', () => {
-  it('a pet: happy, leans in (head tilt), boredom drops, and nothing interrupts it for a moment', () => {
+  it('a pet: lies down on its tummy to be petted, happy, boredom drops, and nothing interrupts it for a moment', () => {
     const h = mk()
     h.b.needs.boredom = 0.5
     h.b.handleInput({ kind: 'pet', source: 'mouse' })
     run(h, 0.2)
     expect(h.b.arbiter.owner).toBe('command')
     expect(h.dog.moods.some((m) => m.startsWith('happy'))).toBe(true)
-    expect(poses(h.dog)).toContain('headTilt')
+    expect(poses(h.dog)).toContain('lie')
+    expect(poses(h.dog)).not.toContain('headTilt')
     expect(h.b.needs.boredom).toBeCloseTo(0.2, 1)
     run(h, 3)
     expect(h.b.arbiter.owner).toBe('none')
+    expect(h.dog.pose).toBe('stand') // and it gets up again when the petting is over
+  })
+
+  it('a pet while it is running stops it first (it does not lie down in mid-stride)', () => {
+    const h = mk()
+    void h.dog.moveTo(100, GROUND, 'run')
+    run(h, 0.3)
+    const x = h.dog.x
+    h.b.handleInput({ kind: 'pet', source: 'touch' })
+    run(h, 1)
+    expect(Math.abs(h.dog.x - x)).toBeLessThan(15)
+    expect(h.dog.pose).toBe('lie')
   })
 })
 
@@ -631,6 +644,17 @@ describe('events (what the sounds listen to)', () => {
     const ev = collect(h)
     h.b.handleInput({ kind: 'pet', source: 'mouse' })
     expect(ev.some((e) => e.kind === 'pet')).toBe(true)
+  })
+
+  it('a pet says where it came from (the touch sensor or the mouse)', () => {
+    const touch = mk()
+    const t = collect(touch)
+    touch.b.handleInput({ kind: 'pet', source: 'touch' })
+    expect(t.find((e) => e.kind === 'pet')).toEqual({ kind: 'pet', source: 'touch' })
+    const mouseH = mk()
+    const m = collect(mouseH)
+    mouseH.b.handleInput({ kind: 'pet', source: 'mouse' })
+    expect(m.find((e) => e.kind === 'pet')).toEqual({ kind: 'pet', source: 'mouse' })
   })
 
   it('you can stop listening', () => {

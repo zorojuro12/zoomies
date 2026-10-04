@@ -66,7 +66,7 @@ describe('the cue table', () => {
     ['it sits down idle', act('wentIdle'), 'sigh'],
     ['a backspace head tilt', react('backspace'), 'whine'],
     ['you shake the mouse', react('shake'), 'yip_excited'],
-    ['you pet it', { kind: 'pet' }, 'yip_excited'],
+    ['you pet it', { kind: 'pet', source: 'mouse' }, 'yip_excited'],
     ['you call it (the controller button)', { kind: 'call' }, 'yip_excited']
   ]
   for (const [name, event, sound] of cases) {
@@ -338,7 +338,7 @@ describe('odd situations', () => {
       act('returned'),
       react('greet'),
       react('sleep', 'end'),
-      { kind: 'pet' },
+      { kind: 'pet', source: 'mouse' },
       { kind: 'bounce', x: 300, strength: 0.4 }
     ]
     for (let i = 0; i < 5000; i++) {
