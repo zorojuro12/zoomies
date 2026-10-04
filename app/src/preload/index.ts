@@ -4,6 +4,7 @@ import type { Rect } from '@shared/geometry'
 import type { ActivityEvent, WindowRect } from '@shared/os'
 import type { InputEvent } from '@shared/input'
 import type { BuzzerPreset } from '@shared/serial'
+import type { NewDogProgress, NewDogResult } from '@shared/ipc'
 
 // Custom APIs for renderer
 const api = {}
@@ -40,6 +41,14 @@ const zoomies = {
   },
   getSerialStatus: (): Promise<{ connected: boolean; port: string | null }> =>
     ipcRenderer.invoke('serial:status'),
+  newDog: (): Promise<NewDogResult> => ipcRenderer.invoke('dog:new'),
+  savedDog: (): Promise<unknown> => ipcRenderer.invoke('dog:saved'),
+  resetDog: (): Promise<void> => ipcRenderer.invoke('dog:reset'),
+  onNewDogProgress: (cb: (p: NewDogProgress) => void): (() => void) => {
+    const listener = (_e: unknown, p: NewDogProgress): void => cb(p)
+    ipcRenderer.on('dog:progress', listener)
+    return () => ipcRenderer.removeListener('dog:progress', listener)
+  },
   transcribe: (audio: Uint8Array, mime: string): Promise<string> =>
     ipcRenderer.invoke('speech:transcribe', { audio, mime }),
   interpret: (text: string): Promise<string> => ipcRenderer.invoke('command:interpret', text),

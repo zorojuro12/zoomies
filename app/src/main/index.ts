@@ -1,7 +1,8 @@
 import { app, shell, BrowserWindow, Tray, Menu } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { sendTo, registerIpc } from './ipc-main'
+import { sendTo, registerIpc, registerDogIpc } from './ipc-main'
+import { createNewDogFlow } from './services/new-dog-main'
 import { loadDotenvFiles } from './services/dotenv'
 import { transcribe } from './services/elevenlabs-stt'
 import { interpretCommand } from './services/gemini-command'
@@ -63,6 +64,8 @@ function createMainWindow(): void {
     sendStatus: (s) => sendTo(win, 'serial:status', s)
   })
   app.on('will-quit', () => serial.stop())
+  // "Upload new dog…": pick a photo, make a dog from it, remember it (progress goes to the screen and this terminal).
+  registerDogIpc(createNewDogFlow(win))
   registerIpc(
     os,
     serial.buzz,

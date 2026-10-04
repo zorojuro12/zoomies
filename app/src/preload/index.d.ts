@@ -3,6 +3,7 @@ import type { Rect } from '@shared/geometry'
 import type { ActivityEvent, WindowRect } from '@shared/os'
 import type { InputEvent } from '@shared/input'
 import type { BuzzerPreset } from '@shared/serial'
+import type { NewDogProgress, NewDogResult } from '@shared/ipc'
 
 export interface ZoomiesApi {
   getWindows(): Promise<WindowRect[]>
@@ -13,6 +14,10 @@ export interface ZoomiesApi {
   onInput(cb: (e: InputEvent) => void): () => void
   onSerialStatus(cb: (s: { connected: boolean; port: string | null }) => void): () => void
   getSerialStatus(): Promise<{ connected: boolean; port: string | null }>
+  newDog(): Promise<NewDogResult>
+  savedDog(): Promise<unknown>
+  resetDog(): Promise<void>
+  onNewDogProgress(cb: (p: NewDogProgress) => void): () => void
   transcribe(audio: Uint8Array, mime: string): Promise<string>
   interpret(text: string): Promise<string>
   buzz(preset: BuzzerPreset): void

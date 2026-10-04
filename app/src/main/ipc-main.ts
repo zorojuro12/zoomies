@@ -1,7 +1,7 @@
 // Typed IPC bridge (Task 3 of a-p1-overlay.md). Channel names and payload shapes only ever come
 // from `@shared/ipc` — nobody else touches raw channel strings.
 import { ipcMain, type BrowserWindow } from 'electron'
-import type { IpcChannel, IpcChannels } from '@shared/ipc'
+import type { IpcChannel, IpcChannels, NewDogResult } from '@shared/ipc'
 import type { OsLayer } from '@shared/os'
 import type { BuzzerPreset } from '@shared/serial'
 import type { SerialStatus } from './hardware/serial-reader'
@@ -40,4 +40,15 @@ export function registerIpc(
   })
   ipcMain.handle('os:windows', () => os.getWindows())
   ipcMain.handle('os:workArea', () => os.getWorkArea())
+}
+
+/** The right-click "Upload new dog…" actions (E2). */
+export function registerDogIpc(flow: {
+  run(): Promise<NewDogResult>
+  saved(): Promise<unknown>
+  reset(): Promise<void>
+}): void {
+  ipcMain.handle('dog:new', () => flow.run())
+  ipcMain.handle('dog:saved', () => flow.saved())
+  ipcMain.handle('dog:reset', () => flow.reset())
 }

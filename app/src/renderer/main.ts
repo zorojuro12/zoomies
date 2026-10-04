@@ -11,10 +11,13 @@ import { SoundCues } from './behaviour/cues'
 import { FrameGovernor } from './behaviour/fps'
 import type { FpsTier } from './behaviour/fps'
 import { timingFor } from './behaviour/timing'
-import { createDog } from './dog/create-dog'
+import { DEFAULT_DOG_SPEC, createDog, loadDogFile } from './dog/create-dog'
 import { ClickThroughGate } from './host/click-through'
 import { CommandBar } from './host/command-bar'
 import { routeCommand } from './host/command-router'
+import { DogMenu, NewDogCard } from './host/new-dog-card'
+import { buildDog } from './dog/spec/build-dog'
+import type { DogFile } from '@shared/dog-file'
 import { createBrowserVoiceInput } from './host/voice-input'
 import { handleClip } from './host/voice-flow'
 import type { InputEvent } from '@shared/input'
@@ -201,6 +204,47 @@ async function start(): Promise<void> {
   void dog.moveTo(homeX - 3, groundY(), 'walk')
 
   if (searchParams.get('log') === '1') Object.assign(window, { __dog: dog }) // dev: poke it from the console
+  // ---- right-click the dog: "Upload new dog…" makes a new dog from a photo, any time ----------------
+  // The dog is swapped in place (same spot, same pose); a custom dog is remembered between launches.
+  const swapper = dog as unknown as { rebuild?: (file: DogFile) => void }
+  let customDog = false
+  const swapTo = (spec: unknown, why: string): boolean => {
+    if (!swapper.rebuild) {
+      console.warn('[dog] this dog cannot be swapped (placeholder fallback)')
+      return false
+    }
+    swapper.rebuild(buildDog(spec))
+    console.log(`[dog] swapped to ${why}`)
+    return true
+  }
+  const newDogCard = new NewDogCard(document.body)
+  window.zoomies.onNewDogProgress((p) => newDogCard.update(p))
+  const dogMenu = new DogMenu(document.body, {
+    onUpload: () => {
+      void window.zoomies.newDog().then((r) => {
+        if (r.ok && swapTo(r.spec, `"${r.name}" (new dog from your photo)`)) customDog = true
+      })
+    },
+    onReset: () => {
+      void (async () => {
+        await window.zoomies.resetDog()
+        const original = await loadDogFile(DEFAULT_DOG_SPEC)
+        swapper.rebuild?.(original)
+        customDog = false
+        console.log('[dog] swapped back to the original dog')
+      })()
+    }
+  })
+  window.addEventListener('contextmenu', (e) => {
+    if (!dog.hitTest(e.clientX, e.clientY)) return
+    e.preventDefault()
+    dogMenu.show(e.clientX, e.clientY, customDog)
+  })
+  // the dog from last time, if there is one
+  void window.zoomies.savedDog().then((saved) => {
+    if (saved && swapTo(saved, 'your saved dog')) customDog = true
+  })
+
   const ball = createBall(window.innerWidth / 2, groundY() - 200)
   if (behaviourOn) {
     behaviour = new Behaviour({
@@ -324,7 +368,9 @@ async function start(): Promise<void> {
         dog.hitTest(e.clientX, e.clientY) ||
         (!behaviour?.fetch.carrying && ballHit(ball, e.clientX, e.clientY)) ||
         dragging ||
-        commandBar.hit(e.clientX, e.clientY)
+        commandBar.hit(e.clientX, e.clientY) ||
+        dogMenu.hit(e.clientX, e.clientY) ||
+        newDogCard.hit(e.clientX, e.clientY)
       const next = gate.update(performance.now(), overInteractive)
       if (next !== null) window.zoomies.setClickThrough(next === 'clickThrough')
     })
