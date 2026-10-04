@@ -204,6 +204,39 @@ describe('DogMotion: jumps', () => {
   })
 })
 
+describe('DogMotion: the ground under the dog (for its shadow)', () => {
+  it('equals the dog y when it is on the ground', () => {
+    const m = make({})
+    expect(m.getGroundY()).toBe(GROUND_Y)
+  })
+
+  it('stays on the ground while the dog jumps up and comes back down', () => {
+    const m = make({})
+    void m.jumpTo(700, GROUND_Y, { apexPx: 100 })
+    let highest = GROUND_Y
+    for (let f = 0; f < 90; f++) {
+      m.update(1000 / 60)
+      highest = Math.min(highest, m.getState().y)
+      expect(m.getGroundY()).toBe(GROUND_Y) // the shadow does not rise with the dog
+    }
+    expect(GROUND_Y - highest).toBeGreaterThan(50) // and the dog really was in the air
+  })
+
+  it('is the lower of the two levels when jumping to a lower platform', () => {
+    const m = make({})
+    void m.jumpTo(700, GROUND_Y + 80, { apexPx: 60 })
+    m.update(16)
+    expect(m.getGroundY()).toBe(GROUND_Y + 80)
+  })
+
+  it('equals the dog y again once it has landed', () => {
+    const m = make({})
+    void m.jumpTo(700, GROUND_Y - 50, { apexPx: 80 })
+    step(m, 2)
+    expect(m.getGroundY()).toBe(GROUND_Y - 50)
+  })
+})
+
 describe('DogMotion: layers and extras', () => {
   it('a wagging tail moves; a still one does not', () => {
     const m = make({})
