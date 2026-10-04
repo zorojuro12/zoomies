@@ -47,6 +47,37 @@ When they disagree, the earlier one wins — and fix the later one.
 - **Every hardware action has a mouse equivalent.** The demo must survive a
   loose wire.
 
+## Build and test
+
+All commands run from `app/`. Verified in WSL (Linux) at scaffold time:
+`npm run typecheck`, `npm run lint`, `npm test`, `npm run build`. **`npm run dev`
+still needs its first run on Windows and on a Mac** — update this line once done.
+
+| Command | Does |
+|---|---|
+| `npm install` | Install deps (run separately in each OS clone — never share `node_modules`) |
+| `npm run dev` | Launch the app with hot reload |
+| `npm test` / `npm run test:watch` | Vitest — `src/**/*.test.ts`, co-located with the code |
+| `npm run typecheck` | `tsc` for main/preload (`tsconfig.node.json`) and renderer (`tsconfig.web.json`) |
+| `npm run lint` / `npm run format` | ESLint / Prettier |
+| `npm run build` | Typecheck + production build to `out/` |
+
+Pipeline (`pipeline/`): Python 3.11+ venv, `pip install -r requirements.txt`, `pytest`.
+
+## File structure
+
+| Path | Contents |
+|---|---|
+| `app/src/main/` | Electron main process (`index.ts`); `os/`, `hardware/`, `services/` for Lane A |
+| `app/src/preload/` | IPC bridge exposed to the renderer |
+| `app/src/renderer/` | `index.html` + `main.ts` (render host); `dog/` (B), `world/`, `behaviour/` (A), `audio/` (C), `ui/` |
+| `app/src/shared/` | Contracts and constants imported as `@shared/...` by main, preload and renderer |
+| `pipeline/` | Python reconstruction pipeline (B) |
+| `hardware/arduino/zoomies_controller/` | Controller sketch (C) |
+| `scripts/` | Helper tools (C) |
+| `assets/` | `photo/`, `views/`, `dog/`, `sounds/` |
+| `docs/`, `journal/` | PRD, stack, plans, workflow guide, session journal |
+
 ## Git
 
 - Branch off `dev` as `<lane>/<task>`: `a/…`, `b/…`, `c/…`. Never commit directly
