@@ -264,19 +264,19 @@
 
 **Checkpoint 1: distances and normals**
 
-- [ ] **Step 1: Write failing tests** — Spec, `workArea = {0,0,1000,800}`: (a) no solids, `distance(500,400)` = 400, `distance(500,790)` = 10, `normal(500,790)` ≈ (0, −1) ±1e-3; (b) solid `{100,100,200,100}`: `distance(200,90)` = 10, `normal(200,90)` ≈ (0, −1); `distance(150,150)` = −50 (inside); corner `distance(90,90)` = 14.142 ± 1e-3; (c) `sdBox(0,0,{x:-5,y:-5,w:10,h:10})` = −5; (d) 70 solids passed → only the first 64 affect `distance` (a 65th solid around the test point has no effect).
-- [ ] **Step 2: Run** — `npx vitest run src/renderer/world/world-sdf.test.ts` → FAIL (module not found).
-- [ ] **Step 3: Implement** `sdBox`, `World`.
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Commit** — `npx vitest run src/renderer/world/world-sdf.test.ts && git add app/src/renderer/world/world-sdf.ts app/src/renderer/world/world-sdf.test.ts && git commit -m "feat: world SDF - work area bounds and window solids"`
+- [x] **Step 1: Write failing tests** — Spec, `workArea = {0,0,1000,800}`: (a) no solids, `distance(500,400)` = 400, `distance(500,790)` = 10, `normal(500,790)` ≈ (0, −1) ±1e-3; (b) solid `{100,100,200,100}`: `distance(200,90)` = 10, `normal(200,90)` ≈ (0, −1); `distance(150,150)` = −50 (inside); corner `distance(90,90)` = 14.142 ± 1e-3; (c) `sdBox(0,0,{x:-5,y:-5,w:10,h:10})` = −5; (d) 70 solids passed → only the first 64 affect `distance` (a 65th solid around the test point has no effect).
+- [x] **Step 2: Run** — `npx vitest run src/renderer/world/world-sdf.test.ts` → FAIL (module not found).
+- [x] **Step 3: Implement** `sdBox`, `World`.
+- [x] **Step 4: Run** → PASS, 4 tests.
+- [x] **Step 5: Commit** — `npx vitest run src/renderer/world/world-sdf.test.ts && git add app/src/renderer/world/world-sdf.ts app/src/renderer/world/world-sdf.test.ts && git commit -m "feat: world SDF - work area bounds and window solids"` → `55414d8`
 
 **Checkpoint 2: which windows become solids**
 
-- [ ] **Step 1: Write failing tests** — Spec, `workArea = {0,0,1920,1032}`: (a) a window `{-50, 100, 400, 300}` → solid `{0, 100, 350, 300}` (clipped); (b) a maximized window `{0,0,1920,1032}` → left out; a 1800×980 window (≈ 89 %) → kept; (c) a window fully below the work area (`y` 1040) → left out; order stays topmost first.
-- [ ] **Step 2: Run** → FAIL (`worldSolids` not exported).
-- [ ] **Step 3: Implement** `worldSolids`.
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Commit** — `npx vitest run src/renderer/world/world-sdf.test.ts && git add app/src/renderer/world/world-sdf.ts app/src/renderer/world/world-sdf.test.ts && git commit -m "feat: world solids from windows (clip, skip maximized)"`
+- [x] **Step 1: Write failing tests** — Spec, `workArea = {0,0,1920,1032}`: (a) a window `{-50, 100, 400, 300}` → solid `{0, 100, 350, 300}` (clipped); (b) a maximized window `{0,0,1920,1032}` → left out; a 1800×980 window (≈ 89 %) → kept; (c) a window fully below the work area (`y` 1040) → left out; order stays topmost first.
+- [x] **Step 2: Run** → FAIL (`worldSolids` not exported).
+- [x] **Step 3: Implement** `worldSolids`.
+- [x] **Step 4: Run** → PASS, 8 tests total in the file.
+- [x] **Step 5: Commit** — `npx vitest run src/renderer/world/world-sdf.test.ts && git add app/src/renderer/world/world-sdf.ts app/src/renderer/world/world-sdf.test.ts && git commit -m "feat: world solids from windows (clip, skip maximized)"` → `634f778`
 
 **Checkpoint 3 (manual): debug draw**
 
