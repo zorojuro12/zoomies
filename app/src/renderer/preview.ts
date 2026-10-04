@@ -8,6 +8,8 @@ import type { DogFile } from '@shared/dog-file'
 import { PlaceholderDog } from './dog/placeholder/placeholder-dog'
 import { SdfDog } from './dog/sdf/SdfDog'
 import { buildDog } from './dog/spec/build-dog'
+import { normalizeSpec } from './dog/spec/dog-spec'
+import { mountSpecEditor } from './ui/editor/spec-editor'
 import { createRenderContext, loadJson } from './host/scene'
 
 const POSES: PoseName[] = ['stand', 'sit', 'lie', 'sleep', 'playBow', 'headTilt']
@@ -30,13 +32,25 @@ async function start(): Promise<void> {
   const params = new URLSearchParams(window.location.search)
   const specName = params.get('spec') ?? (params.get('dog') === 'sdf' ? 'default' : null)
   const dog = specName !== null ? new SdfDog() : new PlaceholderDog()
+  const rawSpec =
+    specName !== null ? await loadJson<unknown>(assetUrl(`dog/${specName}.spec.json`)) : null
   const dogFile =
-    specName !== null
-      ? buildDog(await loadJson<unknown>(assetUrl(`dog/${specName}.spec.json`)))
-      : await loadJson<DogFile>(assetUrl(ASSETS.placeholderDog))
+    rawSpec !== null ? buildDog(rawSpec) : await loadJson<DogFile>(assetUrl(ASSETS.placeholderDog))
   const errors = validateDogFile(dogFile)
   if (errors.length > 0) throw new Error(`Invalid dog file: ${errors.join('; ')}`)
   await dog.init(ctx, dogFile)
+  // ?spec=<name>&edit=1 opens the dog editor: drag a slider, the dog rebuilds live; Save downloads the spec.
+  if (rawSpec !== null && params.get('edit') === '1' && dog instanceof SdfDog) {
+    mountSpecEditor(document.body, {
+      spec: normalizeSpec(rawSpec),
+      onChange: (spec) => {
+        const next = buildDog(spec)
+        const problems = validateDogFile(next)
+        if (problems.length > 0) console.error('Editor produced an invalid dog:', problems)
+        else dog.rebuild(next)
+      }
+    })
+  }
   const groundY = (): number => window.innerHeight * 0.7
   dog.placeAt(window.innerWidth / 2, groundY())
 

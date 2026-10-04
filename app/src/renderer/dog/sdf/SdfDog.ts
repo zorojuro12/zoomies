@@ -32,6 +32,7 @@ function makeShadowTexture(): THREE.CanvasTexture {
 export class SdfDog implements DogView, DogController {
   private motion: DogMotion | null = null
   private camera: THREE.OrthographicCamera | null = null
+  private scene: THREE.Scene | null = null
   private quad: THREE.Mesh | null = null
   private shadow: THREE.Mesh | null = null
   private boneNodes: THREE.Object3D[] = []
@@ -59,23 +60,10 @@ export class SdfDog implements DogView, DogController {
     if (dog.shapes.length > MAX_SHAPES) {
       throw new Error(`SdfDog supports at most ${MAX_SHAPES} shapes, got ${dog.shapes.length}`)
     }
-    const motion = new DogMotion(dog)
-    this.motion = motion
     this.camera = ctx.camera
-    ctx.scene.add(motion.root) // holds only bones and the fetch ball; the dog itself is the shader
-
-    // Per-shape constants: which bone it rides on, its offset, kind, sizes, blend, colour.
-    dog.shapes.forEach((s, i) => {
-      this.boneNodes.push(motion.boneNode(s.bone))
-      this.offsets.push(new THREE.Matrix4().makeTranslation(s.offset[0], s.offset[1], s.offset[2]))
-      this.uniforms.uKind.value[i] = KIND_INDEX[s.kind]
-      this.uniforms.uParams.value[i]!.set(s.params[0] ?? 0, s.params[1] ?? 0, s.params[2] ?? 0)
-      this.uniforms.uBlend.value[i] = s.blend
-      this.uniforms.uColor.value[i]!.fromArray(s.color)
-    })
-    this.uniforms.uCount.value = dog.shapes.length
+    this.scene = ctx.scene
     this.uniforms.uPixel.value = 1 / ctx.renderer.getPixelRatio()
-    this.shadowW = dog.heightPx * 1.4
+    this.populate(dog)
 
     // Soft contact shadow on the ground (drawn behind the dog).
     this.shadow = new THREE.Mesh(
@@ -105,6 +93,45 @@ export class SdfDog implements DogView, DogController {
     this.quad.renderOrder = 1
     this.quad.frustumCulled = false
     ctx.scene.add(this.quad)
+    this.update(0)
+  }
+
+  /** Build the motion + per-shape shader data for a dog file (used by init and rebuild). */
+  private populate(dog: DogFile): void {
+    if (dog.shapes.length > MAX_SHAPES) {
+      throw new Error(`SdfDog supports at most ${MAX_SHAPES} shapes, got ${dog.shapes.length}`)
+    }
+    const motion = new DogMotion(dog)
+    this.motion = motion
+    this.scene!.add(motion.root) // holds only bones and the fetch ball; the dog itself is the shader
+    this.boneNodes = []
+    this.offsets = []
+    // Per-shape constants: which bone it rides on, its offset, kind, sizes, blend, colour.
+    dog.shapes.forEach((s, i) => {
+      this.boneNodes.push(motion.boneNode(s.bone))
+      this.offsets.push(new THREE.Matrix4().makeTranslation(s.offset[0], s.offset[1], s.offset[2]))
+      this.uniforms.uKind.value[i] = KIND_INDEX[s.kind]
+      this.uniforms.uParams.value[i]!.set(s.params[0] ?? 0, s.params[1] ?? 0, s.params[2] ?? 0)
+      this.uniforms.uBlend.value[i] = s.blend
+      this.uniforms.uColor.value[i]!.fromArray(s.color)
+    })
+    this.uniforms.uCount.value = dog.shapes.length
+    this.shadowW = dog.heightPx * 1.4
+  }
+
+  /**
+   * Swap in a different dog file live (the editor uses this). Keeps the dog where it is and in
+   * the same pose; the ball and any move in progress are dropped.
+   */
+  rebuild(dog: DogFile): void {
+    if (!this.motion || !this.scene) throw new Error('SdfDog used before init()')
+    const prev = this.motion.getState()
+    this.scene.remove(this.motion.root)
+    this.populate(dog)
+    this.motion.placeAt(prev.x, prev.y)
+    if (prev.pose !== 'moving' && prev.pose !== 'airborne') {
+      void this.motion.setPose(prev.pose, { durationMs: 1 })
+    }
     this.update(0)
   }
 
