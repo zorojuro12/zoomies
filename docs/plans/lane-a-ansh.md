@@ -46,17 +46,18 @@
 
 ## P1 — Spikes: prove the Windows overlay
 **Goal:** the hardest Windows-specific unknowns are solved and Daniel has a host to render into.
-- [ ] **Overlay window:** transparent, frameless, covers the primary display's work area + taskbar; no taskbar icon/focus stealing. Handle display scaling (DIP vs physical px).
-- [ ] **Above the taskbar:** `setAlwaysOnTop(true, 'screen-saver')` — the Windows taskbar sits above normal always-on-top windows, so without this the dog sinks behind it when sleeping on the taskbar.
-- [ ] **Measure the full-screen transparent overlay cost:** with the dog idle, check Task Manager GPU % and frame time on the demo laptop. Windows composites the whole transparent window every frame even with region rendering. If it's costly → fallback: a **small window that follows the dog** (plus a small window for the ball in flight). Decide before CP1.
-- [ ] **Click-through:** `setIgnoreMouseEvents(true, { forward: true })`; toggle off while the cursor is over `DogView.hitTest` (or the ball / aim UI).
-- [ ] **Windows `OsLayer` spike** (tech-stack §1.1 — verify): enumerate visible top-level windows with rects (DWM extended frame bounds) and z-order; filter cloaked/tool windows; taskbar rect via `workArea`; poll ~5–10 Hz with change detection.
-- [ ] **Activity:** `uiohook-napi` (verify it builds on Windows) → typing rate + backspace ratio (timing only); mouse speed; idle seconds via `powerMonitor`.
-- [ ] **Render host:** `WebGLRenderer` (alpha), `OrthographicCamera` in desktop pixels (y down per §3.1), render loop hosting `DogView`, **region rendering** (scissor to `DogView.getBounds()` + ball), **FPS / frame-time overlay**.
-- [ ] **World SDF v0:** 2D SDF of screen edges + taskbar + window rects; debug draw toggle.
-- [ ] **Ball + mouse slingshot v0:** drag back from the ball to aim (power + angle), release to launch; gravity, restitution, rolling friction against the world SDF; settles.
-- **Tests (Vitest):** world SDF distance for rect sets; ball integrator settles; slingshot angle/power mapping.
-- **Done when (CP1):** on Windows — overlay with working click-through, live window list feeding the world SDF, placeholder dog hosted, ball bounces off real windows, FPS overlay showing frame time.
+- [x] **Overlay window:** transparent, frameless, covers the primary display, no taskbar icon/focus stealing, stays above the taskbar, click-through (mouse events pass straight through — gating a specific hit area is Task 3). Verified by hand on Windows 2026-10-04: dog renders over other apps, no taskbar button, tray "Quit Zoomies" works, GPU log confirms NVIDIA active. Commit `f8acda4`.
+- [x] **Above the taskbar:** `setAlwaysOnTop(true, 'screen-saver')` — done as part of the overlay window above; confirmed clicking the taskbar doesn't hide the dog.
+- [x] **Measure the full-screen transparent overlay cost** (Windows demo laptop, 2026-10-04): idle overlay **30%** GPU (Electron process, Processes tab), patrolling overlay **30%** (no visible stutter), windowed baseline **27%**; **CPU 2.7%** (trivial — this is purely a GPU/compositing cost). Also found: Desktop Window Manager itself runs **~20% GPU** during the overlay (not measured in the windowed baseline) — DWM has to alpha-composite the transparent full-screen layer every frame, a real cost the small-window fallback probably *would* reduce (not measured for sure, but DWM load should scale with composited area). System-wide total ≈ **40% GPU** during patrol.
+  **Decision: keep the full-screen overlay, skip the small-window fallback** — not because it wouldn't help (it probably would, via DWM), but because it isn't worth building now: 40% GPU still leaves plenty of headroom for a short plugged-in demo, there's no visible stutter, CPU cost is negligible, and the fallback needs real new engineering (a window that tracks the dog every frame across runs/jumps/sleep-on-taskbar, plus a second one for the ball in flight per the risk table) that this close to the deadline is better spent on P1 work that doesn't exist at all yet (OsLayer, activity, world/ball). Recorded as a stretch/Could for P4 polish only if time remains.
+- [x] **Click-through:** `setIgnoreMouseEvents(true, { forward: true })` via `ClickThroughGate` (hold timer so crossing the dog's edge doesn't flicker); toggles off over the dog, the ball, or while dragging it (slingshot). Verified by hand on Windows.
+- [x] **Windows `OsLayer` spike** (tech-stack §1.1): `WindowsOsLayer` polls DWM extended frame bounds + z-order at 150ms with change detection; filters cloaked/tool/minimized/titleless/self/off-screen/tiny windows; taskbar rect derived from `workArea` vs display bounds. Verified by hand: outlines track every real window, minimizing removes one, maximized windows excluded.
+- [x] **Activity:** `uiohook-napi` builds fine on Windows → `ActivityTracker` (typing rate + backspace ratio, timing only; mouse speed; idle seconds via `powerMonitor`), throttled per §3.5.
+- [x] **Render host:** `WebGLRenderer` (alpha), `OrthographicCamera` in DIP (y down), render loop hosting the dog, FPS/frame-time overlay (`FrameStats`/`Hud`). **Region rendering/scissor skipped** — Task 1's GPU numbers (40% system-wide, no stutter, CPU 2.7%) didn't need it; left in P4's perf pass if it's ever actually needed.
+- [x] **World SDF v0:** `World`/`sdBox` — signed distance to the work-area bounds + window solids (min of per-solid SDFs), debug outline draw toggle (`ZOOMIES_DEBUG=1`).
+- [x] **Ball + mouse slingshot v0:** `ball.ts` (gravity, restitution, friction, substepped, no tunnelling) + `slingshot.ts` (drag-to-aim, power/angle, launch). Three bugs found and fixed during manual verification (render-order vs. the dog's transparent SDF quad; a flush-with-floor collision oscillation; an off-screen freeze when spawned under a near-full-screen window — root-caused by Daniel) — see `journal/2026-10-04_0529_daniel_ball-freeze-root-cause.md` and `docs/plans/a-p1-overlay.md` Task 7/8. `maxPullPx` tuned 200→100 after a feel check.
+- **Tests (Vitest):** world SDF distance for rect sets; ball integrator settles; slingshot angle/power mapping. 524/524 passing project-wide as of CP1 close, incl. 200-random-layout and fully-covered-screen fuzz tests for the ball.
+- **Done when (CP1):** on Windows — overlay with working click-through, live window list feeding the world SDF, placeholder dog hosted, ball bounces off real windows, FPS overlay showing frame time. **Confirmed twice in a row from a fresh `git pull`, no restart needed between, 2026-10-04.**
 
 ## P2 — MVP: everything Must works end to end
 - [ ] **Fetch sequence** (behaviour state machine): ball launched → dog looks at ball → `moveTo` landing spot (run) → pickup (`attachBall`) → return → drop near cursor → wag. Works with `PlaceholderDog`, then Daniel's dog.
@@ -84,6 +85,7 @@
 - [ ] **Step-out-of-photo opening:** a second window showing `assets/photo/dog.jpeg`; on start the dog emerges from the frame (animation timing with Daniel).
 - [ ] **X-ray toggle UI** wired to `DogView.setDebugView` + world SDF debug draw.
 - [ ] **Perf pass** (pull in `benchmark-optimization-loop` / `performance-optimizer`): frame-time budget, region rendering, polling rates.
+- [ ] **Stretch — small-window overlay fallback:** only if time remains and GPU headroom becomes an actual problem (it wasn't in P1 — 40% GPU, no stutter, CPU 2.7%). A window that tracks the dog's current bounds instead of the full screen, to cut DWM's compositing cost; needs a second small window for the ball in flight too. See P1 risks/measurement notes.
 - [ ] **Cheap Coulds** that ride on your work: zoomies when everything is minimised (#24), backspace head tilt (#22), time-of-day mood (#23), then Tiger Data (#32), ElevenLabs L3 (#30), Gemini G4 (#31) in that order if time remains.
 - **Done when (CP4 — feature freeze):** promote + tag `freeze`.
 
@@ -91,6 +93,7 @@
 - [ ] Merge final fixes, tag `final`, run the demo path from a clean clone on Windows.
 - [ ] Secret scan before the repo goes public.
 - [ ] Support Abel on the video capture (screen recording on the Windows laptop).
+- [ ] **GPU assignment on the demo laptop:** after the final `npm run build:win`, assign "High performance" GPU to the built `zoomies.exe` (Settings → Display → Graphics, or the laptop will silently run on the weak integrated GPU — see risks table).
 
 ---
 
@@ -104,6 +107,7 @@
 | Integration bugs cluster on the Windows machine (Macs can't run the real overlay) | Daniel develops in a standalone dog preview page; merge into `dev` more often than checkpoints |
 | WSL → push → pull → rebuild loop is slow for Windows-only work | Consider running Claude Code natively on Windows for this repo (see PRD §6.4) |
 | Lane overload | Hand L2/G2/G3 to Daniel; cut per `00-shared.md` §6 |
+| **Demo laptop has a hybrid AMD+NVIDIA GPU; Chrome/Electron default to the weak AMD iGPU unless explicitly assigned.** Measured 2026-10-04: SDF dog cost went from avg 10ms/p95 122ms (AMD) to avg 0.8ms/p95 0.9ms (NVIDIA) on the same build. The fix (Windows Settings → Display → Graphics → assign the app's `.exe` to "High performance") is per-exe-path and was only applied to `chrome.exe` and this dev session's `node_modules/electron/dist/electron.exe` — it will **not** carry over to the real `npm run build:win` output (different exe path). | **Before the real demo (P5):** re-assign "High performance" GPU to the actual built `zoomies.exe` path on the demo laptop. Check `chrome://gpu`-equivalent (Electron's `chrome://gpu` works the same way) shows the NVIDIA GPU `*ACTIVE*` before presenting. Added as a P5 checklist item below. |
 
 ## Phase plans to write (writing-plans)
 `docs/plans/a-p1-overlay.md` → `a-p2-mvp-behaviour.md` → `a-p3-hardware-terrain-voice.md` → `a-p4-polish.md` — each written at the start of its phase.
