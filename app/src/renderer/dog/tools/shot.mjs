@@ -63,7 +63,9 @@ app.whenReady().then(async () => {
     show: false,
     webPreferences: {
       backgroundThrottling: false,
-      ...(stub ? { preload: fileURLToPath(new URL('./zoomies-stub-preload.cjs', import.meta.url)) } : {})
+      ...(stub
+        ? { preload: fileURLToPath(new URL('./zoomies-stub-preload.cjs', import.meta.url)) }
+        : {})
     }
   })
   win.webContents.on('console-message', (event) => {
