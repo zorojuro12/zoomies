@@ -27,12 +27,9 @@ const debug = searchParams.get('debug') === '1'
 document.body.style.background = overlay ? 'transparent' : '#1d2a33'
 
 async function start(): Promise<void> {
-  console.log('[diag] start() begin')
   const ctx = createRenderContext(canvas)
-  console.log('[diag] renderContext created')
 
   let workArea: Rect = await window.zoomies.getWorkArea()
-  console.log('[diag] workArea', JSON.stringify(workArea))
   const groundY = (): number =>
     overlay ? workArea.y + workArea.h : window.innerHeight - (overlay ? 48 : 40)
 
@@ -86,13 +83,10 @@ async function start(): Promise<void> {
 
   // createDog never leaves the host without a dog: bad spec file -> default dog; SDF dog fails to
   // start -> the placeholder (see dog/create-dog.ts).
-  console.log('[diag] about to createDog')
   const dog = await createDog(ctx)
-  console.log('[diag] dog created')
   dog.placeAt(window.innerWidth / 2, groundY())
 
   const ball = createBall(window.innerWidth / 2, groundY() - 200)
-  console.log('[diag] ball created at', ball.x, ball.y)
 
   window.addEventListener('mousemove', (e) => dog.lookAt({ x: e.clientX, y: e.clientY }))
   if (!overlay) {
@@ -126,22 +120,9 @@ async function start(): Promise<void> {
   const stats = new FrameStats()
 
   let last = performance.now()
-  let diagFrameCount = 0
   const frame = (now: number): void => {
     const frameMs = now - last
     last = now
-    if (diagFrameCount < 3 || diagFrameCount % 120 === 0) {
-      console.log(
-        '[diag] frame',
-        diagFrameCount,
-        'ball',
-        ball.x.toFixed(1),
-        ball.y.toFixed(1),
-        'resting',
-        ball.resting
-      )
-    }
-    diagFrameCount++
     const workStart = performance.now()
     stepBall(ball, world, frameMs)
     worldView.setBall(ball)

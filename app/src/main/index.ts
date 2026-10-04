@@ -36,7 +36,6 @@ function createMainWindow(): void {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
-  win.webContents.on('console-message', (_e, _level, message) => console.log('[renderer]', message))
 
   const os = createOsLayer(overlay)
   registerIpc(os)
