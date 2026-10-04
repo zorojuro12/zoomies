@@ -108,5 +108,6 @@ new session with "resume from the journal".
 
 ## Workflow
 
-Ansh and Abel: `docs/dev-workflow-guide.md`. Daniel: his own workflow, within
-the rules above.
+Each person keeps their own workflow guide locally (not in the repo); Ansh and
+Abel share Ansh's Claude Code setup, Daniel uses his own — all within the rules
+above.

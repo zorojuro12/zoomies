@@ -117,7 +117,7 @@ Changing a contract = a small PR everyone sees. Everything else can change freel
 
 ## 4. Claude Code tooling — load lean, pull in on demand
 
-> **Superseded for Ansh and Abel by `docs/dev-workflow-guide.md` §3**, which was checked against the actual ECC files: `rules/ecc/web/` and `contract-first` turned out not to apply (Core Web Vitals / CSS; OpenAPI-centric), and docs lookup needs a Context7 MCP we don't have. The tiers below remain the general idea.
+> **Superseded for Ansh and Abel by their personal workflow guides (kept locally, not in the repo)**, which were checked against the actual ECC files: `rules/ecc/web/` and `contract-first` turned out not to apply (Core Web Vitals / CSS; OpenAPI-centric), and docs lookup needs a Context7 MCP we don't have. The tiers below remain the general idea.
 
 **Shared vs personal.** The repo's `.claude/` and `CLAUDE.md` hold the **lead's workflow**, used by Lanes A and C. Teammate 2 keeps their own skills/agents in their **personal `~/.claude/`** (user scope) so the two workflows never collide in the repo. Everyone — whatever their workflow — follows the same **repo conventions**: `CLAUDE.md`, branch rules (§5.1), lane ownership (§2), contracts (§3), "never commit keys". Personal tweaks go in `CLAUDE.local.md` / `.claude/settings.local.json` (gitignored).
 

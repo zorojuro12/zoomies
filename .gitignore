@@ -24,3 +24,6 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Personal workflow guides (local only)
+docs/dev-workflow-guide*.md

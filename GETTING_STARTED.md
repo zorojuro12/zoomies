@@ -11,7 +11,7 @@ For **Ansh, Daniel and Abel**. Do sections 1–5 once, then use section 6 every 
 2. [`CLAUDE.md`](CLAUDE.md) — the rules everyone follows (lanes, contracts, git, testing).
 3. [`docs/plans/00-shared.md`](docs/plans/00-shared.md) — phases, contracts, who needs what from whom, checkpoints.
 4. **Your lane plan:** [`lane-a-ansh.md`](docs/plans/lane-a-ansh.md) · [`lane-b-daniel.md`](docs/plans/lane-b-daniel.md) · [`lane-c-abel.md`](docs/plans/lane-c-abel.md)
-5. Background when you need it: [PRD](docs/specs/2026-10-03-zoomies-prd.md) · [tech stack](docs/tech-stack.md) · [dev workflow guide](docs/dev-workflow-guide.md) (Ansh + Abel)
+5. Background when you need it: [PRD](docs/specs/2026-10-03-zoomies-prd.md) · [tech stack](docs/tech-stack.md)
 
 ## 2. Install the tools
 
@@ -72,7 +72,7 @@ Never commit `.env`. The repo will be public for Devpost.
 
 **Ansh (Lane A)**
 - Run the app on Windows (section 4).
-- Trim `.claude/` and adapt the skills — `docs/dev-workflow-guide.md` §3a and §3c — then zip `.claude/` for Abel.
+- Trim `.claude/` and adapt the skills (done 2026-10-03), then send Abel the `.claude/` zip and his workflow guide.
 - Lead the contracts session (`docs/plans/00-shared.md` §3) → branch `a/contracts`.
 
 **Daniel (Lane B)**
@@ -89,7 +89,7 @@ pip install -r requirements.txt
 - ⚡ Open Huawei's Google Drive folder (link in the challenge brief); if there's a larger dog photo, save it as `assets/photo/dog.jpeg`.
 - ⚡ Google AI Studio: generate the side/back views (`docs/plans/lane-c-abel.md` P1). Daniel is waiting on them.
 - Sign up for ElevenLabs; ask the MLH desk about Gemini/ElevenLabs credits.
-- Unzip Ansh's `.claude/` into the repo folder; use Claude in **default permission mode**.
+- Unzip Ansh's `.claude/` into the repo folder and read the workflow guide Ansh sends you; use Claude in **default permission mode**.
 - Install the Arduino IDE and test each hardware part with the built-in examples.
 
 **Someone, now:** create the project on **Devpost** and add all three teammates (track opt-ins happen there later).
