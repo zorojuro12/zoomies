@@ -16,6 +16,7 @@ import { createBlink, stepBlink } from '../motion/blink'
 import type { MoodName } from '../motion/mood'
 import { sampleFur } from '../fur/fur'
 import { FurCoat } from '../fur/fur-renderer'
+import { gpuProblem, shaderProblem } from './gpu-check'
 import type { Sphere } from './bounds'
 import { MAX_SHAPES, SDF_FRAG, SDF_VERT } from './sdf-shader'
 
@@ -100,10 +101,11 @@ export class SdfDog implements DogView, DogController {
     this.m.setMood(name, intensity)
   }
 
-  /** Turn the extra motion polish on or off (anticipation before jumps, moods). */
+  /** Turn the extra motion polish on or off (anticipation before jumps, moods, standing life). */
   setPolish(on: boolean): void {
     this.m.polish.anticipation = on
     this.m.polish.mood = on
+    this.m.polish.idle = on
   }
 
   // ---- DogView -------------------------------------------------------------------------
@@ -146,6 +148,17 @@ export class SdfDog implements DogView, DogController {
     this.quad.frustumCulled = false
     ctx.scene.add(this.quad)
     this.update(0)
+
+    // Guard against the silent black dog: if this GPU cannot run the shaders, say so loudly (the host
+    // answers with the placeholder dog) instead of drawing nothing.
+    const problem =
+      gpuProblem(ctx.renderer.capabilities) ?? shaderProblem(ctx.renderer, ctx.scene, ctx.camera)
+    if (problem) {
+      for (const o of [this.quad, this.shadow, this.motion?.root, this.coat?.mesh]) {
+        if (o) ctx.scene.remove(o)
+      }
+      throw new Error(`SdfDog cannot run here: ${problem}`)
+    }
   }
 
   /** Build the motion + per-shape shader data for a dog file (used by init and rebuild). */
