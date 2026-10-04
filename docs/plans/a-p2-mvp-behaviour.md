@@ -100,6 +100,8 @@ attention moves toward 1 when the user is active, toward 0 when not, as an expon
 
 ### Task 6: Sound cues
 
+> **Built (branch `a/p2-sounds`), against Abel's real player and all 12 sounds:** `Behaviour` now emits events (`onEvent`: fetch steps, activity notes, reaction start/end, pet, ball bounce with strength), and `behaviour/cues.ts` (`SoundCues`) turns them into `playSound` calls: pan follows the dog (the ball for bounces), a little quieter the farther from the cursor, 70% master volume, a cooldown per sound, `pant` (4 s) and `snore` loops started and stopped, mute (`ZOOMIES_MUTE=1` / `?mute=1`). Table: throw -> bark_happy; bringing the ball -> bark_alert; pick-up -> ball_squeak; bounce -> ball_bounce; fetch done -> pant; gave up -> whine; idle -> sigh; asleep -> sigh then snore; welcome back -> yawn then yip_excited; backspace tilt -> whine (soft); mouse shake / pet -> yip_excited. `sneeze` and `paw_step` are unused (no matching event yet). Hear it: `/preview.html?spec=aussie&behaviour=1` in Chrome (click a button once so the browser allows audio); `&audiolog=1` also prints each sound to the console.
+
 `sounds.ts`: behaviour event → `SoundName` (`bark_happy` on launch, `ball_squeak` on pickup, `pant` after fetch, `snore` while asleep, `yawn` on waking, `yip_excited` on greet…) with `pan` from the dog's x over the screen width and a cooldown so nothing repeats too fast. Calls the `AudioPlayer` contract (`StubAudio` until Abel's module lands). Tests: the cue table, pan at the screen edges and centre, cooldown, a missing player is a silent no-op.
 
 ### Task 7: Compose, wire, verify

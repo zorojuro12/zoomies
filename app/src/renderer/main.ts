@@ -2,7 +2,9 @@
 // it watches the cursor. Lane A turns this into the transparent overlay in P1.
 import type { Rect } from '@shared/geometry'
 import type { ActivityEvent, WindowRect } from '@shared/os'
+import { createAudioPlayer } from './audio'
 import { Behaviour } from './behaviour/behaviour'
+import { SoundCues } from './behaviour/cues'
 import { FrameGovernor } from './behaviour/fps'
 import type { FpsTier } from './behaviour/fps'
 import { timingFor } from './behaviour/timing'
@@ -35,6 +37,8 @@ const debug = searchParams.get('debug') === '1'
 // demo can show sleep, waking and the break nudge.
 const behaviourOn = searchParams.get('behaviour') !== '0'
 const demo = searchParams.get('demo') === '1'
+// ?mute=1 (ZOOMIES_MUTE=1): the dog's sounds start off.
+const muted = searchParams.get('mute') === '1'
 document.body.style.background = overlay ? 'transparent' : '#1d2a33'
 
 async function start(): Promise<void> {
@@ -116,6 +120,21 @@ async function start(): Promise<void> {
       hitTest: (x, y) => dog.hitTest(x, y)
     })
     behaviour.setWindows(latestWindows)
+  }
+  // The dog's voice: the behaviour's events (a throw, a pick-up, falling asleep, a bounce...) become
+  // sounds, panned to the dog and a little quieter the farther it is from the cursor.
+  let cues: SoundCues | null = null
+  if (behaviour) {
+    const brain = behaviour
+    const audio = createAudioPlayer()
+    void audio.preload()
+    cues = new SoundCues(audio, {
+      screenW: () => window.innerWidth,
+      dogX: () => dog.getState().x,
+      cursorX: () => brain.cursorX(),
+      muted
+    })
+    brain.onEvent((e) => cues?.handle(e))
   }
   const governor = new FrameGovernor()
   // What the world draws while the dog has the ball in its mouth (nothing: radius 0).
@@ -233,6 +252,7 @@ async function start(): Promise<void> {
     const workStart = performance.now()
     stepBall(ball, world, frameMs)
     behaviour?.update(frameMs)
+    cues?.update(frameMs)
     worldView.setBall(behaviour?.fetch.carrying ? hiddenBall : ball)
     if (!behaviour && !ball.resting) dog.lookAt({ x: ball.x, y: ball.y })
     dog.update(frameMs)

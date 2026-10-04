@@ -39,6 +39,8 @@ const evalJs = arg('eval', '')
 const bench = Number(arg('bench', '0'))
 // --stub 1: run the real app host (index.html) with a fake `window.zoomies` (no OS layer needed)
 const stub = arg('stub', '') === '1'
+// --console 1: print EVERY page console message (default: warnings and errors only)
+const allConsole = arg('console', '') === '1'
 const waitMs = Number(arg('wait', '800'))
 const zoom = Number(arg('zoom', '1'))
 const [width, height] = arg('size', '900x600').split('x').map(Number)
@@ -63,12 +65,15 @@ app.whenReady().then(async () => {
     show: false,
     webPreferences: {
       backgroundThrottling: false,
-      ...(stub ? { preload: fileURLToPath(new URL('./zoomies-stub-preload.cjs', import.meta.url)) } : {})
+      ...(stub
+        ? { preload: fileURLToPath(new URL('./zoomies-stub-preload.cjs', import.meta.url)) }
+        : {})
     }
   })
   win.webContents.on('console-message', (event) => {
     // Show page errors/warnings only (level: 'warning' | 'error').
-    if (event.level === 'warning' || event.level === 'error') console.error('[page]', event.message)
+    if (allConsole || event.level === 'warning' || event.level === 'error')
+      console.error('[page]', event.message)
   })
   await win.loadURL(url)
   win.webContents.setZoomFactor(zoom)

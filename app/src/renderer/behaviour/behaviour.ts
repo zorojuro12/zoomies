@@ -44,6 +44,20 @@ const SETTLE_MS = 1500
 /** One update counts as at most this long (a stall must not teleport the dog); longer is taken in 100 ms pieces. */
 const MAX_UPDATE_MS = 1000
 const STEP_MS = 100
+/** A ball reversing direction faster than this (px/s) is a bounce (slower is just the top of a throw). */
+const BOUNCE_MIN_SPEED = 150
+/** The impact speed that counts as a full-strength bounce. */
+const BOUNCE_FULL_SPEED = 2000
+const BOUNCE_GAP_MS = 80
+
+/** Things that happen, for the sounds (and anything else that wants to listen). */
+export type BehaviourEvent =
+  | { kind: 'fetch'; note: FetchNote }
+  | { kind: 'activity'; note: ActivityNote }
+  | { kind: 'reaction'; id: string; phase: 'start' | 'end' }
+  | { kind: 'pet' }
+  /** The ball bounced at x; strength 0..1 follows how hard it hit. */
+  | { kind: 'bounce'; x: number; strength: number }
 
 export class Behaviour {
   readonly needs: Needs = createNeeds()
@@ -52,6 +66,7 @@ export class Behaviour {
   readonly arbiter = new Arbiter()
 
   private readonly dog: DogController
+  private readonly ball: Ball
   private readonly extras: DogExtras
   private readonly world: World
   private readonly timing: Timing
@@ -73,6 +88,10 @@ export class Behaviour {
   private bringCooldownUntil = 0
   private lookingAtCursor = false
   private awakeMs = 0
+  private prevVx = 0
+  private prevVy = 0
+  private lastBounceMs = Number.NEGATIVE_INFINITY
+  private readonly listeners = new Set<(e: BehaviourEvent) => void>()
 
   private readonly cursor = {
     x: 0,
@@ -104,6 +123,7 @@ export class Behaviour {
 
   constructor(opts: BehaviourOptions) {
     this.dog = opts.dog
+    this.ball = opts.ball
     this.extras = asExtras(opts.dog)
     this.world = opts.world
     this.timing = opts.timing ?? BEHAVIOUR_TIMING
@@ -126,11 +146,28 @@ export class Behaviour {
     // when something more important takes the dog, the previous owner tidies up
     this.arbiter.onPreempt((id) => {
       if (this.current && this.current.id === id) {
-        this.current.stop(this.env)
+        const r = this.current
+        r.stop(this.env)
         this.current = null
+        this.emit({ kind: 'reaction', id: r.id, phase: 'end' })
       }
       if (id === 'pet') this.endPet()
     })
+  }
+
+  /** Listen to what happens (a fetch step, falling asleep, a reaction starting...). Returns a way to stop. */
+  onEvent(cb: (e: BehaviourEvent) => void): () => void {
+    this.listeners.add(cb)
+    return () => this.listeners.delete(cb)
+  }
+
+  /** Where the cursor is (null until it has moved). */
+  cursorX(): number | null {
+    return this.cursor.known ? this.cursor.x : null
+  }
+
+  private emit(e: BehaviourEvent): void {
+    for (const cb of this.listeners) cb(e) // events are rare (a few a second at most), so a small object each is fine
   }
 
   // ---- inputs from the host ----------------------------------------------------------------
@@ -153,6 +190,7 @@ export class Behaviour {
     } else if (e.kind === 'pet') {
       applyNeedsEvent(this.needs, 'pet')
       if (this.arbiter.request('command', 'pet', 1, PET_HOLD_MS)) {
+        this.emit({ kind: 'pet' })
         this.commandHoldMs = PET_HOLD_MS
         this.petting = true
         void this.dog.setPose('headTilt')
@@ -217,6 +255,7 @@ export class Behaviour {
 
   /** Once a frame. A long frame (the slow rates) is taken in 100 ms pieces so time passes at the right speed. */
   update(dtMs: number): void {
+    this.detectBounce()
     let left = Number.isFinite(dtMs) && dtMs > 0 ? Math.min(dtMs, MAX_UPDATE_MS) : 0
     if (left <= 0) {
       this.step(0)
@@ -227,6 +266,25 @@ export class Behaviour {
       this.step(chunk)
       left -= chunk
     }
+  }
+
+  /** A ball that reverses direction fast is a bounce (looked at once per frame, before the time steps). */
+  private detectBounce(): void {
+    const b = this.ball
+    if (b.held || this.fetch.carrying) {
+      this.prevVx = 0
+      this.prevVy = 0
+      return
+    }
+    const flipY = this.prevVy * b.vy < 0 && Math.abs(this.prevVy) > BOUNCE_MIN_SPEED
+    const flipX = this.prevVx * b.vx < 0 && Math.abs(this.prevVx) > BOUNCE_MIN_SPEED
+    if ((flipX || flipY) && this.clockMs - this.lastBounceMs > BOUNCE_GAP_MS) {
+      this.lastBounceMs = this.clockMs
+      const impact = Math.max(flipY ? Math.abs(this.prevVy) : 0, flipX ? Math.abs(this.prevVx) : 0)
+      this.emit({ kind: 'bounce', x: b.x, strength: Math.min(1, impact / BOUNCE_FULL_SPEED) })
+    }
+    this.prevVx = b.vx
+    this.prevVy = b.vy
   }
 
   private step(dt: number): void {
@@ -321,6 +379,7 @@ export class Behaviour {
         r.stop(this.env)
         this.current = null
         this.arbiter.release(r.id)
+        this.emit({ kind: 'reaction', id: r.id, phase: 'end' })
       }
     } else if (owner === 'command') {
       if (this.arbiter.heldMs >= this.commandHoldMs) {
@@ -350,6 +409,7 @@ export class Behaviour {
       this.cooldownUntil.set(r.id, this.clockMs + r.cooldownMs)
       if (r.id === 'greet') this.returnedPending = false
       r.start(ctx, this.env)
+      this.emit({ kind: 'reaction', id: r.id, phase: 'start' })
       return
     }
   }
@@ -390,6 +450,7 @@ export class Behaviour {
   }
 
   private onActivityNote(n: ActivityNote): void {
+    this.emit({ kind: 'activity', note: n })
     if (n === 'returned') {
       this.returnedPending = true
       this.returnedAgeMs = 0
@@ -397,6 +458,7 @@ export class Behaviour {
   }
 
   private onFetchNote(n: FetchNote): void {
+    this.emit({ kind: 'fetch', note: n })
     if (n === 'launched' || n === 'bringing') {
       if (n === 'launched') {
         applyNeedsEvent(this.needs, 'launch')
