@@ -128,3 +128,103 @@ describe('stepBall robustness', () => {
     expect(ball.y).toBeGreaterThanOrEqual(789)
   })
 })
+
+// Bug 3 (the "frozen ball"): a wide, nearly full-height window (under the 90% maximized cut-off)
+// over the ball's spawn point. The nearest way out is down, into the floor, which is solid; the old
+// "march straight up" fallback then carried the ball 600 px off the top of the screen, where
+// everything counts as solid, and it stayed frozen there at y = -590 with its speed climbing.
+describe('stepBall: spawned or landed inside a big window', () => {
+  const WA = { x: 0, y: 0, w: 1920, h: 1032 }
+  const worldWith = (solids: { x: number; y: number; w: number; h: number }[]): World => {
+    const world = new World()
+    world.setBounds(WA)
+    world.setSolids(solids)
+    return world
+  }
+  const inside = (b: { x: number; y: number; r: number }): boolean =>
+    b.x >= -1 && b.x <= WA.w + 1 && b.y >= -1 && b.y <= WA.h + 1
+
+  it('never leaves the screen, even for a moment, and ends up resting in free space', () => {
+    // 1700 x 1032: 88% of the screen, so it still counts as a solid
+    const world = worldWith([{ x: 0, y: 0, w: 1700, h: 1032 }])
+    const ball = createBall(768, 624)
+    for (let i = 0; i < 300; i++) {
+      stepBall(ball, world, STEP_MS)
+      expect(Number.isFinite(ball.x) && Number.isFinite(ball.y)).toBe(true)
+      expect(inside(ball), `frame ${i}: ${ball.x}, ${ball.y}`).toBe(true)
+    }
+    expect(ball.resting).toBe(true)
+    expect(world.distance(ball.x, ball.y) - ball.r).toBeGreaterThanOrEqual(-0.5)
+  })
+
+  it('finds the only way out even when it is far: sideways, 1600 px away', () => {
+    const world = worldWith([{ x: 0, y: 0, w: 1700, h: 1032 }])
+    const ball = createBall(100, 500) // 100 px from the left edge of the screen, inside the window
+    stepBall(ball, world, STEP_MS)
+    // no free space above or below (flush with the top and the floor) and the left edge of the
+    // window IS the screen edge: the way out is to the right, 1600 px away; it must be found.
+    expect(ball.x).toBeGreaterThan(1700)
+  })
+
+  it('does not freeze: a ball that was inside keeps being simulated (it falls to the floor)', () => {
+    const world = worldWith([{ x: 0, y: 0, w: 1700, h: 1032 }])
+    const ball = createBall(768, 624)
+    for (let i = 0; i < 400; i++) stepBall(ball, world, STEP_MS)
+    expect(ball.y).toBeCloseTo(WA.h - ball.r, 0) // on the floor, to the right of the window
+    expect(ball.x).toBeGreaterThan(1700)
+    expect(ball.vy).toBe(0)
+  })
+
+  it('still behaves when there is NO free space anywhere (two windows cover the whole screen): stays on screen and finite', () => {
+    const world = worldWith([
+      { x: 0, y: 0, w: 960, h: 1032 },
+      { x: 960, y: 0, w: 960, h: 1032 }
+    ])
+    const ball = createBall(500, 500)
+    for (let i = 0; i < 300; i++) {
+      stepBall(ball, world, STEP_MS)
+      expect(Number.isFinite(ball.x) && Number.isFinite(ball.y)).toBe(true)
+      expect(inside(ball), `frame ${i}: ${ball.x}, ${ball.y}`).toBe(true)
+    }
+  })
+
+  it('stays finite and on screen for 200 random window layouts and spawn points', () => {
+    let seed = 12345
+    const rand = (): number => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+      return seed / 4294967296
+    }
+    for (let trial = 0; trial < 200; trial++) {
+      const solids = []
+      const n = 1 + Math.floor(rand() * 4)
+      for (let k = 0; k < n; k++) {
+        const w = 100 + rand() * 1700
+        const h = 100 + rand() * 932
+        solids.push({ x: rand() * (WA.w - w), y: rand() * (WA.h - h), w, h })
+      }
+      const world = worldWith(solids)
+      const ball = createBall(10 + rand() * 1900, 10 + rand() * 1000)
+      ball.vx = (rand() - 0.5) * 2000
+      ball.vy = (rand() - 0.5) * 2000
+      for (let i = 0; i < 240; i++) {
+        stepBall(ball, world, STEP_MS)
+        if (!Number.isFinite(ball.x) || !Number.isFinite(ball.y) || !inside(ball)) {
+          throw new Error(
+            `trial ${trial} frame ${i}: ball at ${ball.x}, ${ball.y}; solids ${JSON.stringify(solids)}`
+          )
+        }
+      }
+    }
+  })
+
+  it('a window dropped on a resting ball still pops it out the nearest way (the earlier behaviour is kept)', () => {
+    const world = worldWith([])
+    const ball = createBall(960, 500)
+    for (let i = 0; i < 400; i++) stepBall(ball, world, STEP_MS)
+    expect(ball.resting).toBe(true)
+    world.setSolids([{ x: 900, y: 900, w: 200, h: 132 }]) // lands on the ball, flush with the floor
+    for (let i = 0; i < 60; i++) stepBall(ball, world, STEP_MS)
+    expect(world.distance(ball.x, ball.y) - ball.r).toBeGreaterThanOrEqual(-0.5)
+    expect(inside(ball)).toBe(true)
+  })
+})
