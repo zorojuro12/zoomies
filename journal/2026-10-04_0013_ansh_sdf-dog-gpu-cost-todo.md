@@ -15,10 +15,9 @@ Windows first-run checks (prior session, same day) only launched the stock place
 ## Next Step (exact procedure)
 Dev server must be running (`npm run dev` from `app/`, confirmed serving on `http://localhost:5173`).
 
-1. Open Task Manager (Ctrl+Shift+Esc) → Details tab → find the Electron renderer process → watch its GPU column / the GPU graph in the Performance tab.
-2. Open a browser to `http://localhost:5173/preview.html?dog=sdf&spec=aussie`.
-3. Click **"run ↔"** a couple of times to keep worst-case animation going (idle stand under-reports cost).
-4. DevTools (F12) → Console → paste:
+1. Open Task Manager (Ctrl+Shift+Esc) → **Processes tab** → find the Electron/Chrome process → read GPU % directly (simpler than the Details-tab column route tried earlier).
+2. Open the Electron window or Chrome to `http://localhost:5173/preview.html?dog=sdf&spec=aussie`, click **"run ↔"** a couple of times to keep worst-case animation going (idle stand under-reports cost).
+3. DevTools (F12) → Console → paste:
 
    ```js
    (function(){
@@ -37,8 +36,10 @@ Dev server must be running (`npm run dev` from `app/`, confirmed serving on `htt
      }, 8000);
    })();
    ```
-5. Wait 8s, copy the printed JSON, note the GPU% seen in Task Manager during that window.
-6. Repeat on plain `http://localhost:5173/preview.html` (placeholder dog) as the baseline to compare against.
-7. Report both JSON results + GPU% readings back; write them into the P1 GPU-cost task and decide full-overlay vs. dog-following-window before CP1.
+4. Wait 8s, copy the printed JSON, note the GPU % seen in Task Manager during that window.
+5. Repeat on plain `http://localhost:5173/preview.html` (placeholder dog) as the baseline to compare against.
+6. **Threshold:** p95 near **6.9 ms** means the dog fits inside a 144 Hz frame (1000/144 ≈ 6.94 ms); p95 spikes above that mean dropped frames at 144 Hz (still fine for 60 Hz up to ~16.7 ms — check against whichever refresh rate the demo laptop runs).
+7. Optionally maximize the window to full-screen before sampling — the real overlay will cover the whole display, so a small window under-loads the GPU relative to the real case.
+8. Report both JSON results + GPU % readings back; write them into the P1 GPU-cost task and decide full-overlay vs. dog-following-window before CP1.
 
 This snippet reads the page's existing per-frame status text via `MutationObserver` — no code changes to `preview.ts`, so it's safe to run without touching Daniel's lane.
