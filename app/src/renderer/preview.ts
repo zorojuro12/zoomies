@@ -34,6 +34,11 @@ async function start(): Promise<void> {
   const dog = specName !== null ? new SdfDog() : new PlaceholderDog()
   const rawSpec =
     specName !== null ? await loadJson<unknown>(assetUrl(`dog/${specName}.spec.json`)) : null
+  // ?size=1.6 overrides the spec's overall size (handy for benchmarking the dog at different sizes).
+  const sizeOverride = Number(params.get('size'))
+  if (rawSpec !== null && sizeOverride > 0 && typeof rawSpec === 'object') {
+    ;(rawSpec as Record<string, unknown>).size = sizeOverride
+  }
   const dogFile =
     rawSpec !== null ? buildDog(rawSpec) : await loadJson<DogFile>(assetUrl(ASSETS.placeholderDog))
   const errors = validateDogFile(dogFile)
@@ -90,10 +95,18 @@ async function start(): Promise<void> {
   button('background', () => document.body.classList.toggle('dark'))
   window.addEventListener('mousemove', (e) => dog.lookAt({ x: e.clientX, y: e.clientY }))
 
+  // Deterministic mode for comparing renders: ?pose=sit starts in that pose, ?freeze=N steps a
+  // fixed 1/60 s per frame and stops the dog after N frames, so two runs show the same instant.
+  const startPose = params.get('pose')
+  if (startPose) void dog.setPose(startPose as PoseName, { durationMs: 1 })
+  const freezeAfter = Number(params.get('freeze') ?? 0)
+  let frameCount = 0
+
   let last = performance.now()
   const frame = (now: number): void => {
-    const dt = now - last
+    let dt = now - last
     last = now
+    if (freezeAfter > 0) dt = frameCount++ < freezeAfter ? 1000 / 60 : 0
     dog.update(dt)
     ctx.renderer.render(ctx.scene, ctx.camera)
     const s = dog.getState()
