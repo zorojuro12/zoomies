@@ -49,6 +49,12 @@ const BOUNCE_MIN_SPEED = 150
 /** The impact speed that counts as a full-strength bounce. */
 const BOUNCE_FULL_SPEED = 2000
 const BOUNCE_GAP_MS = 80
+/** An aim (the joystick pulled back) lasts this long after the last aim message. */
+const AIM_HOLD_MS = 500
+/** A call keeps the dog for this long (it runs to the cursor, wags). */
+const CALL_HOLD_MS = 4500
+/** A push-to-talk with no stop message (a loose wire) gives up after this long. */
+const TALK_MAX_MS = 10000
 
 /** Things that happen, for the sounds (and anything else that wants to listen). */
 export type BehaviourEvent =
@@ -56,6 +62,8 @@ export type BehaviourEvent =
   | { kind: 'activity'; note: ActivityNote }
   | { kind: 'reaction'; id: string; phase: 'start' | 'end' }
   | { kind: 'pet' }
+  | { kind: 'call' }
+  | { kind: 'talk'; state: 'start' | 'stop' }
   /** The ball bounced at x; strength 0..1 follows how hard it hit. */
   | { kind: 'bounce'; x: number; strength: number }
 
@@ -88,6 +96,13 @@ export class Behaviour {
   private bringCooldownUntil = 0
   private lookingAtCursor = false
   private awakeMs = 0
+  private aimUntilMs = 0
+  private aimPower = 0
+  private talking = false
+  private talkDeadlineMs = 0
+  private calling = false
+  private overlayKey = ''
+  private lookingAtBall = false
   private prevVx = 0
   private prevVy = 0
   private lastBounceMs = Number.NEGATIVE_INFINITY
@@ -152,6 +167,7 @@ export class Behaviour {
         this.emit({ kind: 'reaction', id: r.id, phase: 'end' })
       }
       if (id === 'pet') this.endPet()
+      if (id === 'call') this.endCall()
     })
   }
 
@@ -185,8 +201,19 @@ export class Behaviour {
 
   handleInput(e: InputEvent): void {
     this.awakeMs = AWAKE_MS
+    // the joystick and the button are the user being here, though the OS activity hooks never see them
+    this.activity.noteInput()
     if (e.kind === 'launch') {
       this.fetch.launch()
+    } else if (e.kind === 'aim') {
+      this.aimUntilMs = this.clockMs + AIM_HOLD_MS
+      this.aimPower = e.power
+    } else if (e.kind === 'call') {
+      this.call()
+    } else if (e.kind === 'pushToTalk') {
+      this.talking = e.state === 'start'
+      this.talkDeadlineMs = this.clockMs + TALK_MAX_MS
+      this.emit({ kind: 'talk', state: e.state })
     } else if (e.kind === 'pet') {
       applyNeedsEvent(this.needs, 'pet')
       if (this.arbiter.request('command', 'pet', 1, PET_HOLD_MS)) {
@@ -243,7 +270,7 @@ export class Behaviour {
    * resting speed when it has settled sitting or lying down, sleep speed when it is asleep.
    */
   fpsTier(): FpsTier {
-    if (this.awakeMs > 0 || this.fetch.active) return 'full'
+    if (this.awakeMs > 0 || this.fetch.active || this.aimActive() || this.talking) return 'full'
     const o = this.arbiter.owner
     if (o === 'reaction' && this.current) {
       const r = this.current
@@ -303,6 +330,7 @@ export class Behaviour {
     this.runOwner(dt)
     this.chooseReaction()
     this.maybeBringBall()
+    this.updateOverlay()
     this.look()
 
     const user = this.activity.state.user
@@ -384,9 +412,64 @@ export class Behaviour {
     } else if (owner === 'command') {
       if (this.arbiter.heldMs >= this.commandHoldMs) {
         if (this.petting) this.endPet()
+        if (this.calling) this.endCall()
         this.arbiter.release(this.arbiter.id)
       }
     }
+  }
+
+  /** The dog is called (button tap): it runs to the cursor, wags and is happy for a moment. */
+  private call(): void {
+    applyNeedsEvent(this.needs, 'pet') // you paid it attention
+    if (!this.arbiter.request('command', 'call', 2, CALL_HOLD_MS)) return // a fetch is more important
+    this.commandHoldMs = CALL_HOLD_MS
+    this.calling = true
+    this.returnedPending = false // answering the call IS its greeting
+    this.emit({ kind: 'call' })
+    if (this.cursor.known) {
+      const wa = this.world.getBounds()
+      const x = Math.min(Math.max(this.cursor.x, wa.x + 20), wa.x + wa.w - 20)
+      void this.dog.moveTo(x, this.dog.getState().y, 'run')
+    }
+    this.extras.setMood('happy', 1)
+    this.dog.setLayer({ tailWag: 1 })
+  }
+
+  private endCall(): void {
+    this.calling = false
+    this.dog.setLayer({ tailWag: 0.5 })
+    this.extras.setMood('neutral', 0)
+    void this.dog.setPose('stand')
+  }
+
+  /**
+   * The joystick aim and push-to-talk are overlays, not owners of the dog: ears up and alert while they
+   * last (more when the stick is pulled harder), relaxed again when they end. Only changes are sent.
+   */
+  private updateOverlay(): void {
+    if (this.talking) this.activity.noteInput() // holding the button down: the user is plainly here
+    if (this.talking && this.clockMs >= this.talkDeadlineMs) {
+      this.talking = false
+      this.emit({ kind: 'talk', state: 'stop' })
+    }
+    const aiming = this.aimActive()
+    const key = aiming ? `a${Math.round(this.aimPower * 10)}` : this.talking ? 't' : ''
+    if (key === this.overlayKey) return
+    this.overlayKey = key
+    if (key === '') {
+      this.dog.setLayer({ earPerk: 0 })
+      if (this.arbiter.owner === 'none') this.extras.setMood('neutral', 0)
+    } else if (aiming) {
+      this.extras.setMood('alert', 0.4 + 0.5 * this.aimPower)
+      this.dog.setLayer({ earPerk: Math.min(1, 0.4 + 0.8 * this.aimPower) })
+    } else {
+      this.extras.setMood('alert', 0.6)
+      this.dog.setLayer({ earPerk: 1 })
+    }
+  }
+
+  private aimActive(): boolean {
+    return this.clockMs < this.aimUntilMs && !this.fetch.active
   }
 
   private endPet(): void {
@@ -435,10 +518,26 @@ export class Behaviour {
   }
 
   private look(): void {
-    const choice = chooseLook({ ballWatched: this.fetch.active, cursorAgeMs: this.cursor.ageMs })
-    if (choice === 'ball') {
+    if (this.fetch.active) {
       this.lookingAtCursor = false // fetch does its own looking
-    } else if (choice === 'cursor') {
+      this.lookingAtBall = false
+      return
+    }
+    if (this.aimActive()) {
+      // the joystick is pulled back: eyes on the ball
+      this.lookPoint.x = this.ball.x
+      this.lookPoint.y = this.ball.y
+      this.dog.lookAt(this.lookPoint)
+      this.lookingAtBall = true
+      this.lookingAtCursor = false
+      return
+    }
+    if (this.lookingAtBall) {
+      this.dog.lookAt(null)
+      this.lookingAtBall = false
+    }
+    const choice = chooseLook({ ballWatched: false, cursorAgeMs: this.cursor.ageMs })
+    if (choice === 'cursor') {
       this.lookPoint.x = this.cursor.x
       this.lookPoint.y = this.cursor.y
       this.dog.lookAt(this.lookPoint)
