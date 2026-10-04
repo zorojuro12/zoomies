@@ -31,3 +31,33 @@ describe('ActivityTracker.typing', () => {
     expect(tracker.typing(1000).keysPerSec).toBe(256)
   })
 })
+
+describe('ActivityTracker.mouseSpeed', () => {
+  it('computes px/s from a straight two-sample move', () => {
+    const tracker = new ActivityTracker()
+    tracker.mouse(0, 0, 0)
+    tracker.mouse(100, 100, 0)
+    expect(tracker.mouseSpeed(100)).toBe(1000)
+  })
+
+  it('sums path length across multiple samples', () => {
+    const tracker = new ActivityTracker()
+    tracker.mouse(0, 0, 0)
+    tracker.mouse(50, 30, 40)
+    tracker.mouse(100, 30, 80)
+    expect(tracker.mouseSpeed(100)).toBe(900)
+  })
+
+  it('returns 0 once the samples age out of the mouse window', () => {
+    const tracker = new ActivityTracker()
+    tracker.mouse(0, 0, 0)
+    tracker.mouse(100, 10, 10)
+    expect(tracker.mouseSpeed(600)).toBe(0)
+  })
+
+  it('returns 0 with a single sample', () => {
+    const tracker = new ActivityTracker()
+    tracker.mouse(0, 0, 0)
+    expect(tracker.mouseSpeed(0)).toBe(0)
+  })
+})
