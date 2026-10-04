@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildDog } from '../spec/build-dog'
 import { sampleFur } from './fur'
-import { FurCoat } from './fur-renderer'
+import { FUR_ROOT_SHADE, FUR_TIP_SHADE, FurCoat } from './fur-renderer'
 
 const dog = buildDog({})
 const fur = sampleFur(dog, 300, 1)
@@ -52,5 +52,15 @@ describe('FurCoat', () => {
     coat.visible = true
     expect(coat.mesh.visible).toBe(true)
     expect(() => coat.dispose()).not.toThrow()
+  })
+})
+
+describe('strand shading (darker at the root, lighter at the tip)', () => {
+  it('the tip is lighter than the root, and the average stays near the base colour', () => {
+    expect(FUR_TIP_SHADE).toBeGreaterThan(FUR_ROOT_SHADE)
+    expect(FUR_ROOT_SHADE).toBeLessThan(1)
+    expect(FUR_TIP_SHADE).toBeGreaterThan(1)
+    expect((FUR_ROOT_SHADE + FUR_TIP_SHADE) / 2).toBeGreaterThan(0.9)
+    expect((FUR_ROOT_SHADE + FUR_TIP_SHADE) / 2).toBeLessThan(1.1)
   })
 })

@@ -57,6 +57,10 @@ void main() {
 }
 `
 
+/** Strands are darker where they leave the skin and lighter at the tip (hair catches the light). */
+export const FUR_ROOT_SHADE = 0.82
+export const FUR_TIP_SHADE = 1.12
+
 const FRAG = /* glsl */ `
 uniform float uOpacity;
 varying vec2 vUv;
@@ -68,7 +72,8 @@ void main() {
   float along = vUv.y;
   float a = exp(-across * across * 2.6) * (1.0 - along * along * 0.85) * uOpacity;
   if (a < 0.01) discard;
-  gl_FragColor = vec4(vColor * vLight, a);
+  float shade = mix(${FUR_ROOT_SHADE.toFixed(3)}, ${FUR_TIP_SHADE.toFixed(3)}, along);
+  gl_FragColor = vec4(vColor * vLight * shade, a);
   #include <colorspace_fragment>
 }
 `

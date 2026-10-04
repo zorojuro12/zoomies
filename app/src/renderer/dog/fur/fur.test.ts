@@ -10,6 +10,7 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import type { DogFile } from '@shared/dog-file'
 import { buildDog } from '../spec/build-dog'
+import { COLOR_KEYS } from '../spec/dog-spec'
 import { sampleFur, shapeRestMatrices, unionDistance } from './fur'
 import type { FurData } from './fur'
 
@@ -151,5 +152,40 @@ describe('sampleFur', () => {
 
   it('handles asking for zero splats', () => {
     expect(sampleFur(dogs[0]![1], 0, 1).count).toBe(0)
+  })
+})
+
+describe('fur colour variation (warm and cool strands, not just lighter and darker)', () => {
+  // A dog whose every colour is the same mid-grey: any warm/cool difference between strands can only
+  // come from the variation itself (not from different regions).
+  const grey = Object.fromEntries(COLOR_KEYS.map((k) => [k, '#808080']))
+  const dog = buildDog({ colors: grey })
+  const fur = sampleFur(dog, 3000, 3)
+  const ratios: number[] = []
+  const lums: number[] = []
+  for (let i = 0; i < fur.count; i++) {
+    ratios.push(fur.color[i * 3]! / fur.color[i * 3 + 2]!)
+    lums.push(lum(fur.color, i))
+  }
+  const mean = (a: number[]): number => a.reduce((x, y) => x + y, 0) / a.length
+  const std = (a: number[]): number => Math.sqrt(mean(a.map((x) => (x - mean(a)) ** 2)))
+
+  it('strands differ in warmth: red over blue varies by about 4-10% (std)', () => {
+    expect(std(ratios) / mean(ratios)).toBeGreaterThan(0.04)
+    expect(std(ratios) / mean(ratios)).toBeLessThan(0.1)
+  })
+  it('the coat as a whole stays neutral: no overall warm or cool lean (mean red/blue within 3% of 1)', () => {
+    expect(mean(ratios)).toBeGreaterThan(0.97)
+    expect(mean(ratios)).toBeLessThan(1.03)
+  })
+  it('strands are also lighter and darker (brightness varies by 5-15%, std)', () => {
+    expect(std(lums) / mean(lums)).toBeGreaterThan(0.05)
+    expect(std(lums) / mean(lums)).toBeLessThan(0.15)
+  })
+  it('never leaves 0..1', () => {
+    for (let i = 0; i < fur.count * 3; i++) {
+      expect(fur.color[i]!).toBeGreaterThanOrEqual(0)
+      expect(fur.color[i]!).toBeLessThanOrEqual(1)
+    }
   })
 })
