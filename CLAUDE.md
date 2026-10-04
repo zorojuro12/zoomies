@@ -51,8 +51,9 @@ When they disagree, the earlier one wins — and fix the later one.
 
 All commands run from `app/`. Verified in WSL (Linux) at scaffold time:
 `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`. `npm run dev`
-verified on **macOS** (Abel, 2026-10-03). **Windows still needs its first run** — update
-this line once done.
+verified on **macOS** (Abel, 2026-10-03) and **Windows** (Ansh, 2026-10-04).
+**Requires Node 22+** (`vitest` needs `^22.12 || ^24`) — on Windows, `nvm use 22.22.0`
+(or set it as the `nvm alias default`) before running any command above.
 
 | Command | Does |
 |---|---|
