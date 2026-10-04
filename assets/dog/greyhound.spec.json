@@ -1,0 +1,35 @@
+{
+  "name": "greyhound",
+  "size": 1.25,
+  "proportions": {
+    "bodyLength": 1.1,
+    "bodyDepth": 0.8,
+    "bodyWidth": 0.7,
+    "legLength": 1.6,
+    "legThickness": 0.75,
+    "neckLength": 1.4,
+    "headSize": 0.85,
+    "snoutLength": 1.6,
+    "snoutWidth": 0.7,
+    "earSize": 0.8,
+    "tailLength": 1.5,
+    "tailThickness": 0.7
+  },
+  "earType": "pointy",
+  "tailType": "curled",
+  "colors": {
+    "coat": "#8d9199",
+    "chest": "#c9ccd2",
+    "blaze": "#8d9199",
+    "muzzle": "#7b7f87",
+    "cheeks": "#8d9199",
+    "brows": "#7b7f87",
+    "legs": "#8d9199",
+    "paws": "#c9ccd2",
+    "ears": "#6f737b",
+    "tail": "#8d9199",
+    "tailTip": "#c9ccd2",
+    "eyes": "#1a1208",
+    "nose": "#15151a"
+  }
+}
