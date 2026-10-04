@@ -4,7 +4,7 @@ import type { Rect } from '@shared/geometry'
 import type { ActivityEvent, WindowRect } from '@shared/os'
 import { createAudioPlayer } from './audio'
 import { PetHand } from './dog/hand/hand-view'
-import { headAnchor } from './dog/hand/head-anchor'
+import { handAnchor } from './dog/hand/head-anchor'
 import { Behaviour } from './behaviour/behaviour'
 import { SoundCues } from './behaviour/cues'
 import { FrameGovernor } from './behaviour/fps'
@@ -145,7 +145,7 @@ async function start(): Promise<void> {
     const petHand = new PetHand(ctx.scene)
     hand = petHand
     behaviour.onEvent((e) => {
-      if (e.kind === 'pet') petHand.play()
+      if (e.kind === 'pet') petHand.play('body')
     })
   }
   const governor = new FrameGovernor()
@@ -268,7 +268,7 @@ async function start(): Promise<void> {
     worldView.setBall(behaviour?.fetch.carrying ? hiddenBall : ball)
     if (!behaviour && !ball.resting) dog.lookAt({ x: ball.x, y: ball.y })
     dog.update(frameMs)
-    if (hand?.playing) hand.update(frameMs, headPoint, headAnchor(dog, headPoint))
+    if (hand?.playing) hand.update(frameMs, headPoint, handAnchor(dog, 'body', headPoint))
     ctx.renderer.render(ctx.scene, ctx.camera)
     const workMs = performance.now() - workStart
     stats.add(frameMs, workMs)

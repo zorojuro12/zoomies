@@ -2,7 +2,7 @@
 // shown only while a petting plays. No GPU needed: only the scene graph is checked.
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { HAND, createHandPose, handPoseAt } from './hand-motion'
+import { HAND, HAND_SPOTS, createHandPose, handPoseAt } from './hand-motion'
 import { PetHand } from './hand-view'
 
 const ANCHOR = { x: 400, y: 300 }
@@ -122,5 +122,30 @@ describe('PetHand', () => {
     hand.dispose()
     expect(scene.children).not.toContain(hand.group)
     expect(hand.group.children.length).toBe(0)
+  })
+
+  it("pets the body when told to: it rests at the body's own height and sweeps further than on the head", () => {
+    const head = new PetHand(new THREE.Scene())
+    const body = new PetHand(new THREE.Scene())
+    head.play('head')
+    body.play('body')
+    head.update(HAND.enterMs, ANCHOR, 100)
+    body.update(HAND.enterMs, ANCHOR, 100)
+    expect(body.group.position.y).toBeCloseTo(ANCHOR.y + HAND_SPOTS.body.hoverY * 100, 4)
+    expect(head.group.position.y).toBeCloseTo(ANCHOR.y + HAND_SPOTS.head.hoverY * 100, 4)
+    let widest = 0
+    for (let t = HAND.enterMs; t <= HAND.durationMs - HAND.exitMs; t += 20) {
+      body.update(20, ANCHOR, 100)
+      widest = Math.max(widest, Math.abs(body.group.position.x - ANCHOR.x))
+    }
+    expect(widest).toBeGreaterThan(100 * HAND_SPOTS.head.strokeWidth * 1.3)
+  })
+
+  it('playing again with another spot switches to that spot', () => {
+    const hand = new PetHand(new THREE.Scene())
+    hand.play('head')
+    hand.play('body')
+    hand.update(HAND.enterMs, ANCHOR, 100)
+    expect(hand.group.position.y).toBeCloseTo(ANCHOR.y + HAND_SPOTS.body.hoverY * 100, 4)
   })
 })

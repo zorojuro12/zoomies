@@ -13,7 +13,7 @@ import { mountSpecEditor } from './ui/editor/spec-editor'
 import { createRenderContext, loadJson } from './host/scene'
 import { createAudioPlayer } from './audio'
 import { PetHand } from './dog/hand/hand-view'
-import { headAnchor } from './dog/hand/head-anchor'
+import { handAnchor } from './dog/hand/head-anchor'
 import { Behaviour } from './behaviour/behaviour'
 import { BuzzerCues } from './behaviour/buzzer-cues'
 import { SoundCues } from './behaviour/cues'
@@ -221,7 +221,7 @@ async function start(): Promise<void> {
     const hand = new PetHand(ctx.scene)
     const headPoint = { x: 0, y: 0 }
     behaviour?.onEvent((e) => {
-      if (e.kind === 'pet') hand.play()
+      if (e.kind === 'pet') hand.play('body')
     })
     if (behaviour) {
       window.addEventListener('click', (e) => {
@@ -399,7 +399,7 @@ async function start(): Promise<void> {
         buzzer.update(dtMs)
       } else fetch.update(dtMs)
       worldView.setBall(fetch.carrying ? hiddenBall : ball) // hidden while it is in the dog's mouth
-      if (hand.playing) hand.update(dtMs, headPoint, headAnchor(dog, headPoint))
+      if (hand.playing) hand.update(dtMs, headPoint, handAnchor(dog, 'body', headPoint))
       fetchState = behaviour ? behaviour.describe() : `fetch ${fetch.state}`
       if (performance.now() < buzzUntil) fetchState += ` · buzzer: ${buzzText}`
     }

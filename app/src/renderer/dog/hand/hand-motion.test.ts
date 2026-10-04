@@ -2,7 +2,7 @@
 // three times (with a little press on each stroke), and slides away. A pure function of time,
 // in units of the dog's height (1 = as tall as the dog), relative to the dog's head.
 import { describe, expect, it } from 'vitest'
-import { HAND, createHandPose, handPoseAt } from './hand-motion'
+import { HAND, HAND_SPOTS, createHandPose, handPoseAt } from './hand-motion'
 import type { HandPose } from './hand-motion'
 
 const at = (t: number): HandPose => handPoseAt(t, createHandPose())
@@ -141,5 +141,44 @@ describe('smooth', () => {
 
   it('garbage time (NaN) means "not there"', () => {
     expect(at(Number.NaN).visible).toBe(false)
+  })
+})
+
+describe('where it pets: the head or the body', () => {
+  const bodyAt = (ms: number): HandPose => handPoseAt(ms, createHandPose(), 'body')
+  const bodyStrokes = (): HandPose[] => {
+    const out: HandPose[] = []
+    for (let ms = HAND.enterMs; ms <= HAND.durationMs - HAND.exitMs; ms += 4) out.push(bodyAt(ms))
+    return out
+  }
+
+  it('the head is the default, and its numbers have not changed', () => {
+    expect(HAND_SPOTS.head.hoverY).toBe(HAND.hoverY)
+    expect(HAND_SPOTS.head.strokeWidth).toBe(HAND.strokeWidth)
+    expect(handPoseAt(1200, createHandPose(), 'head')).toEqual(at(1200))
+  })
+
+  it('on the body it strokes along the torso: longer sweeps than on the head', () => {
+    expect(HAND_SPOTS.body.strokeWidth).toBeGreaterThan(HAND_SPOTS.head.strokeWidth * 1.4)
+    const xs = bodyStrokes().map((p) => p.x)
+    expect(Math.max(...xs)).toBeGreaterThan(0.9 * HAND_SPOTS.body.strokeWidth)
+    expect(Math.max(...xs)).toBeLessThanOrEqual(HAND_SPOTS.body.strokeWidth + 1e-9)
+    expect(Math.min(...xs)).toBeLessThan(-0.9 * HAND_SPOTS.body.strokeWidth)
+  })
+
+  it("on the body it comes to rest at the body's own height and still lands, strokes and leaves like before", () => {
+    expect(bodyAt(HAND.enterMs).y).toBeCloseTo(HAND_SPOTS.body.hoverY, 6)
+    expect(bodyAt(1).visible).toBe(true)
+    expect(bodyAt(HAND.durationMs).visible).toBe(false)
+    const turns = bodyStrokes().reduce((n, p, i, a) => {
+      if (i < 2) return n
+      return (a[i - 1]!.x - a[i - 2]!.x) * (p.x - a[i - 1]!.x) < 0 ? n + 1 : n
+    }, 0)
+    expect(turns).toBeGreaterThanOrEqual(3)
+    expect(turns).toBeLessThanOrEqual(5)
+  })
+
+  it('an unknown spot is treated as the head', () => {
+    expect(handPoseAt(1200, createHandPose(), 'tail' as never)).toEqual(at(1200))
   })
 })

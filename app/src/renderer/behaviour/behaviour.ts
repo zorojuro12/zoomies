@@ -220,7 +220,10 @@ export class Behaviour {
         this.emit({ kind: 'pet', source: e.source })
         this.commandHoldMs = PET_HOLD_MS
         this.petting = true
-        void this.dog.setPose('headTilt')
+        // Lie down on its tummy to be petted (stopping first if it was on the move).
+        const at = this.dog.getState()
+        if (at.pose === 'moving') void this.dog.moveTo(at.x, at.y, 'walk')
+        void this.dog.setPose('lie')
         this.extras.setMood('happy', 1)
         this.dog.setLayer({ tailWag: 1 })
       }

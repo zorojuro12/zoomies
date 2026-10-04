@@ -25,6 +25,15 @@ export const HAND = {
   offY: -0.95
 }
 
+export type HandSpot = 'head' | 'body'
+
+/** Where on the dog it pets: how high above that spot the hand rests, and how far each stroke sweeps. */
+export const HAND_SPOTS: Record<HandSpot, { hoverY: number; strokeWidth: number }> = {
+  head: { hoverY: HAND.hoverY, strokeWidth: HAND.strokeWidth },
+  // stroking the torso of a dog lying down: a little lower and a lot longer strokes along the body
+  body: { hoverY: -0.2, strokeWidth: 0.16 }
+}
+
 export interface HandPose {
   x: number
   y: number
@@ -53,7 +62,8 @@ const landing = (u: number): number => {
 }
 
 /** Where the hand is `tMs` milliseconds after the petting started. Outside the petting: not there. */
-export function handPoseAt(tMs: number, out: HandPose): HandPose {
+export function handPoseAt(tMs: number, out: HandPose, spot: HandSpot = 'head'): HandPose {
+  const { hoverY, strokeWidth } = HAND_SPOTS[spot] ?? HAND_SPOTS.head
   if (!Number.isFinite(tMs) || tMs <= 0 || tMs >= HAND.durationMs) {
     out.x = HAND.offX
     out.y = HAND.offY
@@ -67,7 +77,7 @@ export function handPoseAt(tMs: number, out: HandPose): HandPose {
   if (tMs < HAND.enterMs) {
     const u = tMs / HAND.enterMs
     out.x = HAND.offX * (1 - smooth(u))
-    out.y = HAND.offY + (HAND.hoverY - HAND.offY) * landing(u)
+    out.y = HAND.offY + (hoverY - HAND.offY) * landing(u)
     out.rot = 0
     out.alpha = smooth(u * 1.6)
   } else if (tMs <= strokeEnd) {
@@ -76,15 +86,15 @@ export function handPoseAt(tMs: number, out: HandPose): HandPose {
     const phase = 2 * Math.PI * HAND.strokes * w
     // the sweep eases in at the start and out at the end, so the strokes never begin or stop abruptly
     const env = smooth(w / HAND.strokeEase) * smooth((1 - w) / HAND.strokeEase)
-    out.x = HAND.strokeWidth * env * Math.sin(phase)
-    out.y = HAND.hoverY - HAND.liftDepth * env * Math.sin(phase) * Math.sin(phase)
+    out.x = strokeWidth * env * Math.sin(phase)
+    out.y = hoverY - HAND.liftDepth * env * Math.sin(phase) * Math.sin(phase)
     out.rot = HAND.tilt * env * Math.sin(phase)
     out.alpha = 1
   } else {
     const u = (tMs - strokeEnd) / HAND.exitMs
     const e = smooth(u)
     out.x = HAND.offX * e
-    out.y = HAND.hoverY + (HAND.offY - HAND.hoverY) * e
+    out.y = hoverY + (HAND.offY - hoverY) * e
     out.rot = 0
     out.alpha = 1 - smooth(u * 1.4 - 0.4)
   }

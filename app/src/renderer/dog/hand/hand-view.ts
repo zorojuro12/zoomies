@@ -4,6 +4,7 @@
 // with the dog (1 unit = the dog's height) and fades them. Drawn on top of everything.
 import * as THREE from 'three'
 import { HAND, createHandPose, handPoseAt } from './hand-motion'
+import type { HandSpot } from './hand-motion'
 
 const FILL = 0xfdfdff
 const EDGE = 0x2f3b4d
@@ -57,6 +58,7 @@ export class PetHand {
   private readonly pose = createHandPose()
   private t = 0
   private active = false
+  private spot: HandSpot = 'head'
 
   constructor(private readonly scene: THREE.Scene) {
     this.build()
@@ -69,8 +71,9 @@ export class PetHand {
     return this.active
   }
 
-  /** Start (or restart) a petting. */
-  play(): void {
+  /** Start (or restart) a petting, on the dog's head or its body. */
+  play(spot: HandSpot = 'head'): void {
+    this.spot = spot
     this.t = 0
     this.active = true
   }
@@ -82,7 +85,7 @@ export class PetHand {
       return
     }
     if (Number.isFinite(dtMs) && dtMs > 0) this.t += dtMs
-    handPoseAt(this.t, this.pose)
+    handPoseAt(this.t, this.pose, this.spot)
     if (this.t >= HAND.durationMs) this.active = false
     const ok = Number.isFinite(anchor.x) && Number.isFinite(anchor.y) && dogHeightPx > 0
     this.group.visible = this.pose.visible && ok

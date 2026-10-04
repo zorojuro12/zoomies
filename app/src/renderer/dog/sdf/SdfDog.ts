@@ -116,6 +116,13 @@ export class SdfDog implements DogView, DogController {
     out.y = this.headScratch.y
   }
 
+  /** Where the middle of the dog's body is on screen (the pet hand strokes it when the dog lies down). */
+  bodyPosition(out: { x: number; y: number }): void {
+    this.m.boneWorld('body', this.headScratch)
+    out.x = this.headScratch.x
+    out.y = this.headScratch.y
+  }
+
   /** The dog's standing height in px. */
   dogHeightPx(): number {
     return this.m.getHeightPx()
