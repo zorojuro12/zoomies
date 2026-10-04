@@ -272,3 +272,137 @@ describe('DogMotion: layers and extras', () => {
     expect(m.ballVisible()).toBe(false)
   })
 })
+
+describe('DogMotion: anticipation (a crouch before the jump)', () => {
+  const bodyY = (m: DogMotion): number => m.boneNode('body').position.y
+
+  it('crouches on the ground first: it has not left the ground after 100 ms, and the body is lower', () => {
+    const m = make({})
+    const standY = bodyY(m)
+    void m.jumpTo(700, GROUND_Y, { apexPx: 100 })
+    step(m, 0.1)
+    expect(m.getState().y).toBe(GROUND_Y)
+    expect(m.getState().x).toBe(500)
+    expect(bodyY(m)).toBeGreaterThan(standY + 2) // lower (y is down)
+    expect(m.getState().pose).toBe('airborne') // already counts as part of the jump
+  })
+
+  it('then launches, lands where asked, fires "landed" and resolves (slightly later than without it)', async () => {
+    const m = make({})
+    const events: DogEvent['kind'][] = []
+    m.onEvent((e) => events.push(e.kind))
+    const p = m.jumpTo(700, GROUND_Y, { apexPx: 100 })
+    let highest = GROUND_Y
+    for (let f = 0; f < 200; f++) {
+      m.update(1000 / 60)
+      highest = Math.min(highest, m.getState().y)
+    }
+    await p
+    expect(GROUND_Y - highest).toBeGreaterThanOrEqual(99)
+    expect(m.getState().x).toBeCloseTo(700, 0)
+    expect(events).toContain('landed')
+  })
+
+  it('keeps all four paws on the ground during the crouch, for every dog', () => {
+    for (const [name, spec] of DOGS) {
+      const m = make(spec)
+      void m.jumpTo(700, GROUND_Y)
+      step(m, 0.1)
+      for (const leg of LEGS) {
+        m.pawWorld(leg, tmp)
+        expect(Math.abs(tmp.y - GROUND_Y), `${name} ${leg}`).toBeLessThan(1)
+      }
+    }
+  })
+
+  it('polish.anticipation = false jumps at once, exactly like before', () => {
+    const m = make({})
+    m.polish.anticipation = false
+    void m.jumpTo(700, GROUND_Y, { apexPx: 100 })
+    step(m, 0.1)
+    expect(m.getState().y).toBeLessThan(GROUND_Y - 5)
+  })
+
+  it('a new command during the crouch takes over cleanly (the jump promise still resolves)', async () => {
+    const m = make({})
+    const p = m.jumpTo(700, GROUND_Y)
+    step(m, 0.05)
+    void m.moveTo(520, GROUND_Y, 'walk')
+    await p
+    step(m, 1)
+    expect(m.getState().x).toBeCloseTo(520, 0)
+  })
+})
+
+describe('DogMotion: mood', () => {
+  it('a sleepy dog droops its eyelids and lowers its head; neutral does not', () => {
+    const m = make({})
+    expect(m.getLidDroop()).toBe(0)
+    const neckBefore = m.boneNode('neck').quaternion.z
+    m.setMood('sleepy')
+    step(m, 2)
+    expect(m.getLidDroop()).toBeGreaterThan(0.3)
+    expect(m.boneNode('neck').quaternion.z).not.toBeCloseTo(neckBefore, 3)
+  })
+
+  it('a happy dog has a tail that swings further than a neutral one', () => {
+    const swing = (mood: 'neutral' | 'happy'): number => {
+      const m = make({})
+      m.setMood(mood)
+      let lo = Infinity
+      let hi = -Infinity
+      for (let f = 0; f < 240; f++) {
+        m.update(1000 / 60)
+        const z = m.boneNode('tail1').quaternion.z
+        lo = Math.min(lo, z)
+        hi = Math.max(hi, z)
+      }
+      return hi - lo
+    }
+    expect(swing('happy')).toBeGreaterThan(swing('neutral') * 1.2)
+  })
+
+  it('moods never break the paws-on-the-ground promise', () => {
+    for (const mood of ['happy', 'curious', 'sleepy', 'alert'] as const) {
+      const m = make({})
+      m.setMood(mood)
+      step(m, 1.5)
+      for (const leg of LEGS) {
+        m.pawWorld(leg, tmp)
+        expect(Math.abs(tmp.y - GROUND_Y), `${mood} ${leg}`).toBeLessThan(1)
+      }
+    }
+  })
+
+  it('polish.mood = false ignores setMood', () => {
+    const m = make({})
+    m.polish.mood = false
+    m.setMood('sleepy')
+    step(m, 2)
+    expect(m.getLidDroop()).toBe(0)
+  })
+
+  it('setMood back to neutral returns the eyelids', () => {
+    const m = make({})
+    m.setMood('sleepy')
+    step(m, 2)
+    m.setMood('neutral')
+    step(m, 2)
+    expect(m.getLidDroop()).toBeLessThan(0.01)
+  })
+})
+
+describe('DogMotion: the head leads, the neck follows', () => {
+  it('after a sudden look, the head has turned further than the neck, and they end in proportion', () => {
+    const m = make({})
+    m.lookAt({ x: 900, y: GROUND_Y - 200 })
+    step(m, 0.1)
+    const yawOf = (n: string): number =>
+      Math.abs(new THREE.Euler().setFromQuaternion(m.boneNode(n).quaternion, 'ZYX').y)
+    const earlyRatio = yawOf('neck') / yawOf('head')
+    step(m, 3)
+    const lateRatio = yawOf('neck') / yawOf('head')
+    expect(earlyRatio).toBeLessThan(lateRatio - 0.05)
+    expect(lateRatio).toBeCloseTo(0.4 / 0.6, 1)
+  })
+})

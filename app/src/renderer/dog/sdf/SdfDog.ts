@@ -13,6 +13,7 @@ import { DogMotion } from '../motion/dog-motion'
 import { shapeBound, unionSphereInto } from './bounds'
 import { debugColor, debugFlags } from './debug-view'
 import { createBlink, stepBlink } from '../motion/blink'
+import type { MoodName } from '../motion/mood'
 import { sampleFur } from '../fur/fur'
 import { FurCoat } from '../fur/fur-renderer'
 import type { Sphere } from './bounds'
@@ -92,6 +93,17 @@ export class SdfDog implements DogView, DogController {
   private get m(): DogMotion {
     if (!this.motion) throw new Error('SdfDog used before init()')
     return this.motion
+  }
+
+  /** The dog's feeling (happy, curious, sleepy, alert, neutral), 0..1 strong. Not part of the contract. */
+  setMood(name: MoodName, intensity = 1): void {
+    this.m.setMood(name, intensity)
+  }
+
+  /** Turn the extra motion polish on or off (anticipation before jumps, moods). */
+  setPolish(on: boolean): void {
+    this.m.polish.anticipation = on
+    this.m.polish.mood = on
   }
 
   // ---- DogView -------------------------------------------------------------------------
@@ -286,7 +298,8 @@ export class SdfDog implements DogView, DogController {
     this.motion.update(dtMs) // poses the skeleton and refreshes world matrices
 
     // Blink: squash each eye's height (axis y of the head frame) toward a thin slit and back.
-    const closed = stepBlink(this.blink, dtMs / 1000)
+    // a sleepy mood holds the lids part-way down; a blink still closes them fully
+    const closed = Math.max(stepBlink(this.blink, dtMs / 1000), this.motion.getLidDroop())
     for (let k = 0; k < this.eyeIdx.length; k++) {
       this.uniforms.uParams.value[this.eyeIdx[k]!]!.y =
         this.eyeRy[k]! * (1 - this.eyeShut[k]! * closed)
