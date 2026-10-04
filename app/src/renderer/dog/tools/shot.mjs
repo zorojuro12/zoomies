@@ -13,6 +13,8 @@
 //   --click  button label(s) to click in order, comma separated (e.g. "sit" or "ball,run ↔");
 //            "wait:1500" pauses 1500 ms between clicks (e.g. "walk ↑,wait:1600,walk ↓")
 //   --eval   JavaScript to run in the page after the clicks (e.g. drive an editor slider), then 300 ms
+//   --bench  N: instead of a screenshot, time N frames with the 60 FPS lock OFF and print ms/frame
+//            (so a 4 ms dog and a 15 ms dog stop looking identical). Use --zoom to change the dog's size.
 //   --wait   ms to wait after the last click before the shot (default 800)
 //   --zoom   page zoom factor, makes the small dog bigger (default 1)
 //   --size   WxH of the window in CSS px (default 900x600)
@@ -31,13 +33,19 @@ const clicks = arg('click', '')
   .map((s) => s.trim())
   .filter(Boolean)
 const evalJs = arg('eval', '')
+const bench = Number(arg('bench', '0'))
 const waitMs = Number(arg('wait', '800'))
 const zoom = Number(arg('zoom', '1'))
 const [width, height] = arg('size', '900x600').split('x').map(Number)
 const out = arg('out', '')
-if (!out) {
+if (!out && !bench) {
   console.error('missing --out <file.png>')
   app.exit(2)
+}
+
+if (bench) {
+  app.commandLine.appendSwitch('disable-gpu-vsync')
+  app.commandLine.appendSwitch('disable-frame-rate-limit')
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -79,6 +87,33 @@ app.whenReady().then(async () => {
     await sleep(300)
   }
   await sleep(waitMs)
+
+  if (bench) {
+    const frames = await win.webContents.executeJavaScript(`new Promise((resolve) => {
+      const dts = []
+      let last = performance.now()
+      const tick = (now) => {
+        dts.push(now - last)
+        last = now
+        if (dts.length < ${bench} + 20) requestAnimationFrame(tick)
+        else resolve(dts.slice(20)) // drop warm-up frames
+      }
+      requestAnimationFrame(tick)
+    })`)
+    frames.sort((a, b) => a - b)
+    const avg = frames.reduce((a, b) => a + b, 0) / frames.length
+    const p95 = frames[Math.floor(frames.length * 0.95)]
+    console.log(
+      JSON.stringify({
+        frames: frames.length,
+        avgMs: +avg.toFixed(2),
+        p95Ms: +p95.toFixed(2),
+        fps: +(1000 / avg).toFixed(0)
+      })
+    )
+    app.exit(0)
+    return
+  }
 
   const image = await win.webContents.capturePage()
   await writeFile(out, image.toPNG())

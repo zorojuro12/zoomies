@@ -10,11 +10,11 @@ import type { DogController, DogEvent, DogState, Gait, PoseName } from '@shared/
 import type { DogDebugView, DogRenderContext, DogView } from '@shared/dog-view'
 import type { Point, Rect } from '@shared/geometry'
 import { DogMotion } from '../motion/dog-motion'
+import { shapeBound, unionSphereInto } from './bounds'
+import type { Sphere } from './bounds'
 import { MAX_SHAPES, SDF_FRAG, SDF_VERT } from './sdf-shader'
 
 const KIND_INDEX: Record<ShapeKind, number> = { sphere: 0, capsule: 1, ellipsoid: 2, roundCone: 3 }
-/** Extra room around the dog's bounds for the ray-march quad. */
-const QUAD_MARGIN = 80
 
 function makeShadowTexture(): THREE.CanvasTexture {
   const c = document.createElement('canvas')
@@ -37,6 +37,17 @@ export class SdfDog implements DogView, DogController {
   private shadow: THREE.Mesh | null = null
   private boneNodes: THREE.Object3D[] = []
   private offsets: THREE.Matrix4[] = []
+  // bounding sphere of each shape: centre on its local x axis (cx) and radius, set once per dog
+  private boundCx: number[] = []
+  private boundR: number[] = []
+  // scratch for the per-frame bounds (reused: no allocation in the frame loop)
+  private readonly shapeWorld = new THREE.Matrix4()
+  private readonly centre = new THREE.Vector3()
+  private readonly bx = new Float64Array(MAX_SHAPES)
+  private readonly by = new Float64Array(MAX_SHAPES)
+  private readonly bz = new Float64Array(MAX_SHAPES)
+  private readonly br = new Float64Array(MAX_SHAPES)
+  private readonly dogSphere: Sphere = { x: 0, y: 0, z: 0, r: 0 }
   private shadowW = 150
   private readonly uniforms = {
     uCount: { value: 0 },
@@ -45,6 +56,8 @@ export class SdfDog implements DogView, DogController {
     uBlend: { value: new Array<number>(MAX_SHAPES).fill(0) },
     uColor: { value: Array.from({ length: MAX_SHAPES }, () => new THREE.Vector3()) },
     uInv: { value: Array.from({ length: MAX_SHAPES }, () => new THREE.Matrix4()) },
+    uBound: { value: Array.from({ length: MAX_SHAPES }, () => new THREE.Vector4()) },
+    uDog: { value: new THREE.Vector4() },
     uViewProj: { value: new THREE.Matrix4() },
     uPixel: { value: 1 }
   }
@@ -106,6 +119,8 @@ export class SdfDog implements DogView, DogController {
     this.scene!.add(motion.root) // holds only bones and the fetch ball; the dog itself is the shader
     this.boneNodes = []
     this.offsets = []
+    this.boundCx = []
+    this.boundR = []
     // Per-shape constants: which bone it rides on, its offset, kind, sizes, blend, colour.
     dog.shapes.forEach((s, i) => {
       this.boneNodes.push(motion.boneNode(s.bone))
@@ -114,6 +129,9 @@ export class SdfDog implements DogView, DogController {
       this.uniforms.uParams.value[i]!.set(s.params[0] ?? 0, s.params[1] ?? 0, s.params[2] ?? 0)
       this.uniforms.uBlend.value[i] = s.blend
       this.uniforms.uColor.value[i]!.fromArray(s.color)
+      const bound = shapeBound(s.kind, s.params)
+      this.boundCx.push(bound.cx)
+      this.boundR.push(bound.r)
     })
     this.uniforms.uCount.value = dog.shapes.length
     this.shadowW = dog.heightPx * 1.4
@@ -139,21 +157,31 @@ export class SdfDog implements DogView, DogController {
     if (!this.motion || !this.camera || !this.quad || !this.shadow) return
     this.motion.update(dtMs) // poses the skeleton and refreshes world matrices
 
-    // Shader needs world -> shape-local matrices.
+    // Per shape: the world -> shape-local matrix, and the world position of its bounding sphere.
     const inv = this.uniforms.uInv.value
-    for (let i = 0; i < this.boneNodes.length; i++) {
-      inv[i]!.copy(this.boneNodes[i]!.matrixWorld).multiply(this.offsets[i]!).invert()
+    const bounds = this.uniforms.uBound.value
+    const n = this.boneNodes.length
+    for (let i = 0; i < n; i++) {
+      this.shapeWorld.copy(this.boneNodes[i]!.matrixWorld).multiply(this.offsets[i]!)
+      this.centre.set(this.boundCx[i]!, 0, 0).applyMatrix4(this.shapeWorld)
+      this.bx[i] = this.centre.x
+      this.by[i] = this.centre.y
+      this.bz[i] = this.centre.z
+      this.br[i] = this.boundR[i]!
+      bounds[i]!.set(this.centre.x, this.centre.y, this.centre.z, this.boundR[i]!)
+      inv[i]!.copy(this.shapeWorld).invert()
     }
+    // One sphere around the whole dog: the shader rejects every ray outside it, and the quad is
+    // sized to it (instead of a big square), so far fewer pixels are shaded at all.
+    const dog = unionSphereInto(this.dogSphere, this.bx, this.by, this.bz, this.br, n)
+    this.uniforms.uDog.value.set(dog.x, dog.y, dog.z, dog.r)
     this.camera.updateMatrixWorld()
     this.uniforms.uViewProj.value.multiplyMatrices(
       this.camera.projectionMatrix,
       this.camera.matrixWorldInverse
     )
-
-    // Keep the quad centred on the dog, big enough to hold it.
-    const b = this.motion.getBounds()
-    const size = Math.max(b.w, b.h) + QUAD_MARGIN * 2
-    this.quad.position.set(b.x + b.w / 2, b.y + b.h / 2, 0)
+    const size = dog.r * 2 + 8
+    this.quad.position.set(dog.x, dog.y, 0)
     this.quad.scale.set(size, size, 1)
 
     // Shadow sits under the paws.
