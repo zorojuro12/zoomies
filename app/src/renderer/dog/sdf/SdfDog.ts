@@ -11,6 +11,7 @@ import type { DogDebugView, DogRenderContext, DogView } from '@shared/dog-view'
 import type { Point, Rect } from '@shared/geometry'
 import { DogMotion } from '../motion/dog-motion'
 import { shapeBound, unionSphereInto } from './bounds'
+import { debugColor, debugFlags } from './debug-view'
 import type { Sphere } from './bounds'
 import { MAX_SHAPES, SDF_FRAG, SDF_VERT } from './sdf-shader'
 
@@ -37,6 +38,14 @@ export class SdfDog implements DogView, DogController {
   private shadow: THREE.Mesh | null = null
   private boneNodes: THREE.Object3D[] = []
   private offsets: THREE.Matrix4[] = []
+  // x-ray 'landmarks' view: the skeleton (bones as lines, joints as dots) drawn over the dog
+  private skeleton: THREE.Group | null = null
+  private skelLines: THREE.LineSegments | null = null
+  private skelPoints: THREE.Points | null = null
+  private boneNames: string[] = []
+  private boneParent: number[] = []
+  private showSkeleton = false
+  private readonly skelPos = new THREE.Vector3()
   // bounding sphere of each shape: centre on its local x axis (cx) and radius, set once per dog
   private boundCx: number[] = []
   private boundR: number[] = []
@@ -58,6 +67,8 @@ export class SdfDog implements DogView, DogController {
     uInv: { value: Array.from({ length: MAX_SHAPES }, () => new THREE.Matrix4()) },
     uBound: { value: Array.from({ length: MAX_SHAPES }, () => new THREE.Vector4()) },
     uDog: { value: new THREE.Vector4() },
+    uHard: { value: 0 },
+    uDebug: { value: Array.from({ length: MAX_SHAPES }, () => new THREE.Vector3()) },
     uViewProj: { value: new THREE.Matrix4() },
     uPixel: { value: 1 }
   }
@@ -129,12 +140,79 @@ export class SdfDog implements DogView, DogController {
       this.uniforms.uParams.value[i]!.set(s.params[0] ?? 0, s.params[1] ?? 0, s.params[2] ?? 0)
       this.uniforms.uBlend.value[i] = s.blend
       this.uniforms.uColor.value[i]!.fromArray(s.color)
+      this.uniforms.uDebug.value[i]!.fromArray(debugColor(i))
       const bound = shapeBound(s.kind, s.params)
       this.boundCx.push(bound.cx)
       this.boundR.push(bound.r)
     })
     this.uniforms.uCount.value = dog.shapes.length
     this.shadowW = dog.heightPx * 1.4
+    this.buildSkeleton(dog)
+  }
+
+  /** Bones as lines and joints as dots, hidden until the 'landmarks' x-ray view is chosen. */
+  private buildSkeleton(dog: DogFile): void {
+    if (this.skeleton && this.scene) {
+      this.scene.remove(this.skeleton)
+      this.skelLines?.geometry.dispose()
+      this.skelPoints?.geometry.dispose()
+    }
+    this.boneNames = dog.bones.map((b) => b.name)
+    this.boneParent = dog.bones.map((b) => (b.parent ? this.boneNames.indexOf(b.parent) : -1))
+    const n = this.boneNames.length
+    const lineGeo = new THREE.BufferGeometry()
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 2 * 3), 3))
+    const pointGeo = new THREE.BufferGeometry()
+    pointGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3))
+    this.skelLines = new THREE.LineSegments(
+      lineGeo,
+      // transparent = drawn in the same pass as the dog's transparent quad, and renderOrder 5 puts them on top
+      new THREE.LineBasicMaterial({
+        color: 0x00e5ff,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+      })
+    )
+    this.skelPoints = new THREE.Points(
+      pointGeo,
+      new THREE.PointsMaterial({
+        color: 0xff2d95,
+        size: 4,
+        sizeAttenuation: false,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+      })
+    )
+    for (const o of [this.skelLines, this.skelPoints]) {
+      o.frustumCulled = false
+      o.renderOrder = 5
+    }
+    this.skeleton = new THREE.Group()
+    this.skeleton.add(this.skelLines, this.skelPoints)
+    this.skeleton.visible = this.showSkeleton
+    this.scene!.add(this.skeleton)
+  }
+
+  private updateSkeleton(): void {
+    if (!this.showSkeleton || !this.motion || !this.skelLines || !this.skelPoints) return
+    const lines = this.skelLines.geometry.getAttribute('position') as THREE.BufferAttribute
+    const points = this.skelPoints.geometry.getAttribute('position') as THREE.BufferAttribute
+    for (let i = 0; i < this.boneNames.length; i++) {
+      this.skelPos.setFromMatrixPosition(this.motion.boneNode(this.boneNames[i]!).matrixWorld)
+      points.setXYZ(i, this.skelPos.x, this.skelPos.y, 150)
+      const parent = this.boneParent[i]!
+      if (parent >= 0) {
+        lines.setXYZ(i * 2, points.getX(parent), points.getY(parent), 150)
+        lines.setXYZ(i * 2 + 1, this.skelPos.x, this.skelPos.y, 150)
+      } else {
+        lines.setXYZ(i * 2, this.skelPos.x, this.skelPos.y, 150)
+        lines.setXYZ(i * 2 + 1, this.skelPos.x, this.skelPos.y, 150)
+      }
+    }
+    lines.needsUpdate = true
+    points.needsUpdate = true
   }
 
   /**
@@ -184,6 +262,8 @@ export class SdfDog implements DogView, DogController {
     this.quad.position.set(dog.x, dog.y, 0)
     this.quad.scale.set(size, size, 1)
 
+    this.updateSkeleton()
+
     // Shadow sits under the paws.
     const s = this.motion.getState()
     this.shadow.position.set(s.x, s.y + 2, -80)
@@ -198,8 +278,11 @@ export class SdfDog implements DogView, DogController {
     return this.m.hitTest(x, y)
   }
 
-  setDebugView(_mode: DogDebugView): void {
-    // X-ray views come later (plan P3).
+  setDebugView(mode: DogDebugView): void {
+    const flags = debugFlags(mode)
+    this.uniforms.uHard.value = flags.hardShapes ? 1 : 0
+    this.showSkeleton = flags.skeleton
+    if (this.skeleton) this.skeleton.visible = flags.skeleton
   }
 
   // ---- DogController: delegated to DogMotion --------------------------------------------

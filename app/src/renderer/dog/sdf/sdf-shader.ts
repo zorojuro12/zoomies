@@ -27,6 +27,8 @@ uniform vec3 uColor[MAX_SHAPES];     // linear RGB
 uniform mat4 uInv[MAX_SHAPES];       // world -> shape-local
 uniform vec4 uBound[MAX_SHAPES];     // each shape's bounding sphere: world centre xyz, radius w
 uniform vec4 uDog;                   // one sphere around the whole dog: centre xyz, radius w
+uniform float uHard;                 // x-ray 'shapes' view: 1 = hard union + a flat colour per shape
+uniform vec3 uDebug[MAX_SHAPES];     // the flat colour of each shape in that view
 uniform mat4 uViewProj;              // for writing a correct depth
 uniform float uPixel;                // one device pixel in world units
 
@@ -72,8 +74,9 @@ float map(vec3 p) {
     float db = length(p - bs.xyz) - bs.w; // lower bound of the distance to this shape
     // smin(d, x, k) is just d once x >= d + k, so a shape whose bound is already that far away
     // cannot change the result: skip its exact distance function. Same picture, much less work.
-    float di = (i > 0 && db > d + uBlend[i]) ? db : sdShape(i, p);
-    d = (i == 0) ? di : smin(d, di, uBlend[i]);
+    float reach = (uHard > 0.5) ? 0.0 : uBlend[i];  // hard union has no blend radius
+    float di = (i > 0 && db > d + reach) ? db : sdShape(i, p);
+    d = (i == 0) ? di : ((uHard > 0.5) ? min(d, di) : smin(d, di, uBlend[i]));
   }
   return d;
 }
@@ -132,6 +135,17 @@ void main() {
     wsum += w;
   }
   col /= max(wsum, 1e-4);
+  if (uHard > 0.5) {
+    // X-ray: no blending, no markings; each pixel takes the flat colour of the shape it belongs to.
+    float best = 1e5;
+    vec3 flatCol = vec3(0.5);
+    for (int i = 0; i < MAX_SHAPES; i++) {
+      if (i >= uCount) break;
+      float di = sdShape(i, p);
+      if (di < best) { best = di; flatCol = uDebug[i]; }
+    }
+    col = flatCol;
+  }
 
   // Ambient occlusion: darken creases (under the chin, between the legs) by sampling the SDF
   // a little way out along the normal.
