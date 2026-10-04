@@ -1,6 +1,6 @@
 # Zoomies — Demo Video Plan (≤ 3:00)
 
-Draft by Ansh (covering for Abel, Lane C). Abel owns the final cut, voice-over and Devpost upload.
+Draft by Ansh (covering for Abel, Lane C). Abel owns the final cut, captions and Devpost upload.
 
 **Rules:** ≤ 3:00 total. First 15 s must already show the dog leaving the photo and catching the ball — judges may stop there. Every claim on screen is something the app really does in the recording (no mock-ups). Record on the **Windows demo laptop** (plugged in, high-performance GPU), 1920×1080, FPS overlay on unless a shot says otherwise.
 
@@ -26,43 +26,26 @@ Draft by Ansh (covering for Abel, Lane C). Abel owns the final cut, voice-over a
 | 12 | 2:40–2:52 | **How it's built** | Fast diagram: photo → Gemini dog spec → fitted SDF body + splat coat → animated in code → Electron overlay reading real window rects; ElevenLabs voice; Arduino controller | Edit (slide) | — |
 | 13 | 2:52–3:00 | **Close** | Dog drops the ball at the cursor, wags, looks at camera; logo + "StormHacks 2026 · Huawei Fetching Reality" | Screen rec + edit | ✅ |
 
-## Voice-over script (~150 wpm, ≈ 380 words)
+## On-screen captions (no voice-over)
 
-**[0:00 — over shots 1–2, no VO for the first 3 s, let the squeak land]**
-"This is a photo of a dog. … And this is the same dog — living on my desktop."
+The video has **no narration**. The story is carried by short captions plus the app's own sounds (barks, panting, snoring, squeak, buzzer chirp) — keep the in-app audio, add quiet background music under it. Captions: 1–2 lines, ≤ 10 words per line, bottom-centre, on screen ≥ 2.5 s, white text with a dark shadow so they read over any window. Shot 9 (voice command) is the one place a spoken word is heard — the person saying "sit" — caption it as well.
 
-**[0:15 — title]**
-"Zoomies turns one photo of a dog into a real pet that lives on your screen."
-
-**[0:25 — shot 4]**
-"It's not a generic cartoon. Gemini reads the photo, and we fit the dog's body to it — the white blaze, the copper on the cheeks and legs, the ears — so it reads as *this* dog."
-
-**[0:40 — shot 5]**
-"It runs over your real windows. It watches your cursor, but it never gets in the way — every click goes straight through to the app underneath, unless you're touching the dog."
-
-**[1:00 — shot 6]**
-"Windows are its terrain. Drag the one it's standing on and it rides along. Close it, and it falls."
-
-**[1:15 — shot 7]**
-"You can pet it — with the mouse, or with the touch sensor on our controller."
-
-**[1:30 — shot 8]**
-"While you work, it keeps you company: it lies down next to you while you type, and if you haven't taken a break in a while… it brings you the ball."
-
-**[1:45 — shot 9]**
-"Hold the button and talk to it — ElevenLabs turns your voice into commands."
-
-**[1:55 — shot 10]**
-"Leave it alone and it naps on the taskbar — and drops from sixty frames a second to five, so it costs almost nothing while it sleeps."
-
-**[2:10 — shot 11]**
-"Under the fur there's no mesh. The body is a signed distance field — smooth shapes fitted to the photo — and the coat is a Gaussian splat. The whole dog renders in a couple of milliseconds a frame, and everything you see is animated in code."
-
-**[2:40 — shot 12]**
-"Photo in, Gemini, our fitter, an Electron overlay that reads your real windows, ElevenLabs for its voice, and an Arduino for the joystick and the squeak."
-
-**[2:52 — shot 13]**
-"Zoomies. One photo. Your dog — on your desktop."
+| Shot | Time | Caption |
+|---|---|---|
+| 1 | 0:00 | *(none for 3 s)* → "This is a photo of a dog." |
+| 2 | 0:05 | "…and this is the same dog, on my desktop." |
+| 3 | 0:15 | **Title card:** "Zoomies — one photo becomes a real desktop pet" |
+| 4 | 0:25 | "Built from the photo: shape, markings, colours." · then "Gemini reads the photo → a fitted 3D dog" |
+| 5 | 0:40 | "It lives on top of your real windows." · then "Clicks pass straight through — except on the dog." |
+| 6 | 1:00 | "Windows are its terrain." *(cut with the shot if terrain isn't built)* |
+| 7 | 1:15 | "Pet it — touch sensor or mouse." |
+| 8 | 1:30 | "Typing? It lies down beside you." · then "No break in a while? It brings the ball." |
+| 9 | 1:45 | "Hold the button and talk to it." · then "ElevenLabs speech → Gemini → the dog obeys" |
+| 10 | 1:55 | "Idle → it naps on the taskbar." · then "60 fps → 5 fps while it sleeps" *(FPS overlay visible)* |
+| 11 | 2:10 | "No triangle mesh." · "Body: signed distance field" · "Coat: Gaussian splats" · "~1–3 ms per frame" |
+| 12 | 2:40 | **Diagram card:** "Photo → Gemini dog spec → SDF body + splat coat → animated in code → Electron overlay · ElevenLabs · Arduino" |
+| 12b | 2:47 | "Any photo works:" + 2 s of right-click → Upload new dog → a different dog appears *(Daniel's feature; replaces part of 12 if short on time)* |
+| 13 | 2:52 | "Zoomies. One photo. Your dog, on your desktop." + "StormHacks 2026 · Huawei Fetching Reality" |
 
 ## Recording checklist
 
@@ -71,4 +54,4 @@ Draft by Ansh (covering for Abel, Lane C). Abel owns the final cut, voice-over a
 - [ ] Record each shot separately (OBS or Xbox Game Bar `Win+Alt+R`), 2–3 takes each; keep the FPS overlay on for 2, 10, 11.
 - [ ] Phone video of the controller in hand for 2, 7, 9 — same takes as the screen recording (clap once at the start to sync).
 - [ ] Record the squeak/chirp audio from the room for 2 (the buzzer is the point).
-- [ ] Final check: ≤ 3:00, captions on the VO, no keys/`.env`/terminal with secrets visible in any frame.
+- [ ] Final check: ≤ 3:00, all captions readable at phone size, no keys/`.env`/terminal with secrets visible in any frame.
