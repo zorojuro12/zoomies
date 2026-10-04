@@ -37,7 +37,11 @@ export class Hud {
   }
 }
 
-/** What the HUD says about the controller. */
-export function controllerHudText(s: { connected: boolean; port: string | null }): string {
-  return s.connected ? `controller ${s.port ?? 'connected'}` : 'controller: not found'
+/** What the HUD says about the controller: nothing until a board has connected (no board is normal), then its port, or a note if it goes away. */
+export function controllerHudText(
+  s: { connected: boolean; port: string | null },
+  everConnected: boolean
+): string {
+  if (s.connected) return `controller ${s.port ?? 'connected'}`
+  return everConnected ? 'controller: disconnected' : ''
 }

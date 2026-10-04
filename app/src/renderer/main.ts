@@ -61,10 +61,12 @@ async function start(): Promise<void> {
   // and the buzzer only gets requests while a board is actually connected.
   let buzzer: BuzzerCues | null = null
   let controllerConnected = false
+  let controllerSeen = false
   const onSerialStatus = (s: { connected: boolean; port: string | null }): void => {
     controllerConnected = s.connected
+    if (s.connected) controllerSeen = true
     buzzer?.setEnabled(s.connected)
-    hud.set('controller', controllerHudText(s))
+    hud.set('controller', controllerHudText(s, controllerSeen))
   }
   window.zoomies.onSerialStatus(onSerialStatus)
   // Push-to-talk: the mic is open ONLY while the button is held (controller, the on-screen button, or space).

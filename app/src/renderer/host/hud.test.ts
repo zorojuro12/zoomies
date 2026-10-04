@@ -4,10 +4,15 @@ import { controllerHudText, Hud, VOICE_TEXT_MS } from './hud'
 
 describe('controllerHudText', () => {
   it('shows the port when connected', () => {
-    expect(controllerHudText({ connected: true, port: 'COM3' })).toBe('controller COM3')
+    expect(controllerHudText({ connected: true, port: 'COM3' }, true)).toBe('controller COM3')
   })
-  it('says not found when not', () => {
-    expect(controllerHudText({ connected: false, port: null })).toBe('controller: not found')
+  it('says nothing when there never was a board (testing without hardware is normal)', () => {
+    expect(controllerHudText({ connected: false, port: null }, false)).toBe('')
+  })
+  it('says so when a board that was connected goes away', () => {
+    expect(controllerHudText({ connected: false, port: null }, true)).toBe(
+      'controller: disconnected'
+    )
   })
 })
 
