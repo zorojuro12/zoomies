@@ -287,10 +287,13 @@ export function sampleFur(dog: DogFile, count: number, seed = 1): FurData {
 
     // 5. the surface colour here, with a little brightness variation so the coat is not flat.
     sdf.colorAt(wx, wy, wz, col)
+    // Each strand is a little lighter or darker AND a little warmer or cooler than its neighbours
+    // (up to 6%), so the coat reads as many hairs instead of one flat colour.
     const tint = 0.9 + 0.2 * rand()
-    out.color[k * 3] = Math.min(1, col[0]! * tint)
-    out.color[k * 3 + 1] = Math.min(1, col[1]! * tint)
-    out.color[k * 3 + 2] = Math.min(1, col[2]! * tint)
+    const warm = (rand() - 0.5) * 0.12
+    out.color[k * 3] = Math.min(1, col[0]! * tint * (1 + warm))
+    out.color[k * 3 + 1] = Math.min(1, col[1]! * tint * (1 + warm * 0.25))
+    out.color[k * 3 + 2] = Math.min(1, col[2]! * tint * (1 - warm))
     out.size[k] = 0.7 + 0.6 * rand()
     out.count++
   }
