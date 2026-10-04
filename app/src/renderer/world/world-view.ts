@@ -32,7 +32,16 @@ export class WorldView {
     scene.add(this.group)
 
     const geometry = new THREE.CircleGeometry(1, 24)
-    const material = new THREE.MeshBasicMaterial({ color: BALL_COLOR, side: THREE.DoubleSide })
+    // transparent + depthTest:false puts the ball in the dog's render bucket (its SDF quad is
+    // transparent) so BALL_RENDER_ORDER actually wins — see SdfDog.ts's skeleton overlay for the
+    // same pattern. Plain opaque would draw in the earlier opaque pass and lose regardless of order.
+    const material = new THREE.MeshBasicMaterial({
+      color: BALL_COLOR,
+      side: THREE.DoubleSide,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false
+    })
     this.ballMesh = new THREE.Mesh(geometry, material)
     this.ballMesh.renderOrder = BALL_RENDER_ORDER
     scene.add(this.ballMesh)

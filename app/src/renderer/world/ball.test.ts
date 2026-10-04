@@ -90,6 +90,22 @@ describe('stepBall robustness', () => {
     expect(Math.hypot(ball.vx, ball.vy)).toBeLessThanOrEqual(BALL.maxSpeed)
   })
 
+  it('escapes upward, not stuck oscillating, when a window flush with the floor lands on it', () => {
+    const world = freshWorld()
+    const ball = createBall(500, 790)
+    ball.resting = true
+    ball.vx = 0
+    ball.vy = 0
+
+    // Window's bottom edge sits exactly on the floor, ball centered under it horizontally:
+    // the nearest-edge gradient alone would point straight down, into the floor, forever.
+    world.setSolids([{ x: 400, y: 650, w: 200, h: 150 }])
+    for (let i = 0; i < 30; i++) stepBall(ball, world, STEP_MS)
+
+    expect(ball.y).toBeLessThanOrEqual(650)
+    expect(world.distance(ball.x, ball.y) - ball.r).toBeGreaterThanOrEqual(-0.5)
+  })
+
   it('does not tunnel through the floor on a long dt (dt is clamped and substepped)', () => {
     const world = freshWorld()
     const ball = createBall(500, 700)

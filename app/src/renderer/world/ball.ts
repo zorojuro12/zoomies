@@ -22,7 +22,9 @@ export const BALL = {
   restSpeed: 30,
   restHoldMs: 300,
   maxDtMs: 50,
-  substepMs: 4
+  substepMs: 4,
+  escapeStepPx: 4,
+  escapeMaxSteps: 150
 }
 
 export function createBall(x: number, y: number, r = 10): Ball {
@@ -50,6 +52,18 @@ function resolveCollision(ball: Ball, world: World): boolean {
   const ny = scratchNormal.y
   ball.x += nx * -d
   ball.y += ny * -d
+
+  // A window dragged flush against the floor (or another solid) makes the nearest-edge gradient
+  // point straight into the floor, which pushes back into the window next substep, forever: the
+  // two surfaces share a boundary with no free space between them locally. Escape by marching
+  // straight up in small fixed steps (never resampling the same zero-crossing) until free.
+  for (
+    let i = 0;
+    i < BALL.escapeMaxSteps && world.distance(ball.x, ball.y) - ball.r < 0;
+    i++
+  ) {
+    ball.y -= BALL.escapeStepPx
+  }
 
   const vn = ball.vx * nx + ball.vy * ny
   if (vn < 0) {
