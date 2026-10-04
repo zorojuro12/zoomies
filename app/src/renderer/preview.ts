@@ -92,6 +92,10 @@ async function start(): Promise<void> {
   })
   let ball = false
   button('ball', () => dog.attachBall((ball = !ball)))
+  // X-ray views of the SDF dog: the raw shapes, the skeleton, and back to normal.
+  button('x-ray: shapes', () => dog.setDebugView('shapes'))
+  button('x-ray: skeleton', () => dog.setDebugView('landmarks'))
+  button('x-ray: off', () => dog.setDebugView('normal'))
   button('background', () => document.body.classList.toggle('dark'))
   window.addEventListener('mousemove', (e) => dog.lookAt({ x: e.clientX, y: e.clientY }))
 
