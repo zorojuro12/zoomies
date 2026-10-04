@@ -11,7 +11,7 @@
 |---|---|---|
 | **A** | **What the controller means:** `main/hardware/controller-mapper.ts` (raw messages -> `InputEvent`s), the dog's reactions to `aim` / `call` / `pushToTalk` (and the joystick / button counting as user activity), `behaviour/buzzer-cues.ts` (when the buzzer goes) | built (PR) |
 | **A2** | **The pet hand:** a white cartoon glove slides down and strokes the dog's head for about 2.4 s when a `pet` happens (touch or mouse), `dog/hand/` | next |
-| **B** | **The reader:** `serialport`, auto-detect by `HELLO:zoomies:1` (repeats every 2 s forever: a repeat is a no-op), reconnect on unplug, fake port in tests | |
+| **B** | **The reader:** `serialport`, auto-detect by `HELLO:zoomies:1` (repeats every 2 s forever: a repeat is a no-op), reconnect on unplug, fake port in tests. Files: `line-splitter.ts`, `serial-reader.ts`, `serial-driver.ts`; 6 s silence = dead, probe every port (Arduino-looking first), claim only the one that says HELLO | built (PR) |
 | **C** | **Wiring:** main process + preload + `main.ts` (forward `input:event`, `serial:status`, `serial:buzzer`; HUD status; double-click = call) | |
 
 ## Phase A decisions (Daniel confirmed the approach; numbers are tunable on the real device)
