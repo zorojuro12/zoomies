@@ -1,0 +1,35 @@
+{
+  "name": "golden",
+  "size": 1.1,
+  "proportions": {
+    "bodyLength": 1.3,
+    "bodyDepth": 1.0,
+    "bodyWidth": 1.1,
+    "legLength": 0.55,
+    "legThickness": 1.15,
+    "neckLength": 0.85,
+    "headSize": 1.15,
+    "snoutLength": 1.1,
+    "snoutWidth": 1.1,
+    "earSize": 1.5,
+    "tailLength": 1.1,
+    "tailThickness": 1.0
+  },
+  "earType": "floppy",
+  "tailType": "long",
+  "colors": {
+    "coat": "#d9a441",
+    "chest": "#ecc87a",
+    "blaze": "#ecc87a",
+    "muzzle": "#e3b862",
+    "cheeks": "#d9a441",
+    "brows": "#c8903a",
+    "legs": "#d9a441",
+    "paws": "#ecc87a",
+    "ears": "#b9822f",
+    "tail": "#d9a441",
+    "tailTip": "#ecc87a",
+    "eyes": "#2a1a0a",
+    "nose": "#1a1410"
+  }
+}
