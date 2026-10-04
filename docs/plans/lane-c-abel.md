@@ -46,7 +46,7 @@
 - [ ] ⚡ **Huawei folder:** open the Google Drive link from the challenge brief. Download the dog photo(s) and any brief/rules. If there's a bigger version of the Aussie photo, save it as `assets/photo/dog.jpeg` (replacing the current 380×466 one). Tell the team about any extra rules.
 - [ ] Clone the repo; unzip Ansh's `.claude/` into it; install **GitHub Desktop** (optional) and the **Arduino IDE**.
 - [ ] Accounts: **Google AI Studio** (Gemini) and **ElevenLabs**. Ask at the MLH desk whether there are credits for either. Put API keys only in `.env` (never commit it).
-- [ ] Contracts session (with Ansh + Daniel): agree the **landmarks format** (Lane B plan), the **sound names** (below), and the **serial protocol** (`00-shared.md` §3.7).
+- [ ] Contracts review (with Ansh + Daniel): check the **landmarks format** (`00-shared.md` §3.9, `app/src/shared/landmarks.ts`), the **sound names** (`SOUND_NAMES` in `app/src/shared/audio.ts`), and the **serial protocol** (§3.7, `app/src/shared/serial.ts`).
 - **Done when (CP0):** the app runs on your Mac with the placeholder dog.
 
 ## P1 — The dog's source material ⚡ (start immediately — Daniel is waiting on it)
@@ -69,7 +69,7 @@ Example prompt: *"This exact dog, identical markings and colours (black coat, wh
 - [ ] Full body in frame, plain background
 
 ### 2. Mark landmarks → `assets/views/landmarks.json`
-- [ ] With Claude, build a tiny **landmark picker**: `scripts/landmark_picker.html` — open an image, click points in order, it shows the name being placed and downloads JSON in the agreed format (point list in `lane-b-daniel.md`). Good first Claude task (~20 min).
+- [ ] With Claude, build a tiny **landmark picker**: `scripts/landmark_picker.html` — open an image, click points in order, it shows the name being placed and downloads JSON in the agreed format (`00-shared.md` §3.9; names in `app/src/shared/landmarks.ts`). Good first Claude task (~20 min).
 - [ ] Mark `front` (the original photo), `side_sit`, `side_stand`, `back` — only the points visible in each view.
 - [ ] Commit views + JSON on `c/views`, PR into `dev`, tell Daniel.
 
