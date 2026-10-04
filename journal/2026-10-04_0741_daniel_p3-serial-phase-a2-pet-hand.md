@@ -28,3 +28,9 @@
 ## Test Coverage
 - **Covered:** the motion, the scene-graph behaviour, the anchor logic.
 - **Not covered:** how it looks on other dogs and sizes (only the Aussie in the preview), on Windows, and with the real touch sensor (phase B/C).
+
+## Addendum: Daniel said "the hand is horrible, no arm, just a hand, make it smoother" (redone)
+- **Shape:** removed the cuff and the sleeve (the arm). It is now JUST a hand: a rounded oval palm, four tapered fingers that splay slightly (the outer two lean outward), a thumb angled out at the side, each a smooth high-segment capsule with a thin dark outline, off-white, and a soft shadow on the dog's head where the fingers fall (a radial-gradient blob; skipped when there is no canvas, as in tests). 13 meshes: (palm + 4 fingers + thumb) x (fill + outline) + the shadow.
+- **Motion:** longer and calmer (2.6 s: 0.5 s slide in, 0.5 s slide out, TWO slow strokes instead of three quick ones); a soft landing (it dips a hair past its resting height and settles); the strokes ease in and out (their sweep, press and tilt grow from nothing and fade to nothing instead of starting at full speed); the fade uses an eased curve, not a straight line. The dog's pet reaction now lasts 2.7 s to match.
+- **Tests:** 16 motion tests (new: the sweep starts and ends at nothing, a soft landing that exactly reaches its resting height); my "stroke window" helper had been including part of the slide in (a test flaw, fixed to use the true time window); the landing is the fastest part so its per-millisecond limit is 0.006 of the dog's height (0.004 for sideways and tilt). 13 view tests. 843/843 in the whole suite, lint exit 0.
+- **Lesson:** I judged the first version by tests alone, then looked at screenshots and found the arm ugly: the flat-colour arm was never going to look good next to a fluffy dog, and "no arm" is simply better. Look at it early.

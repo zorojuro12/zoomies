@@ -10,8 +10,8 @@ const samples = (n = 480): HandPose[] =>
   Array.from({ length: n + 1 }, (_, i) => at((i / n) * HAND.durationMs))
 
 describe('the whole petting', () => {
-  it("takes about 2.4 seconds (as long as the dog's happy reaction)", () => {
-    expect(HAND.durationMs).toBe(2400)
+  it('takes about 2.6 seconds (the dog stays happy about that long)', () => {
+    expect(HAND.durationMs).toBe(2600)
   })
 
   it('is not there before it starts or after it ends', () => {
@@ -26,6 +26,24 @@ describe('the whole petting', () => {
     const p = at(HAND.durationMs / 2)
     expect(p.visible).toBe(true)
     expect(p.alpha).toBe(1)
+  })
+
+  it('the strokes ease in and out: the sweep starts from nothing and ends at nothing (no sudden start or stop)', () => {
+    const strokeStart = HAND.enterMs
+    const strokeEnd = HAND.durationMs - HAND.exitMs
+    expect(Math.abs(at(strokeStart + 5).x)).toBeLessThan(0.002)
+    expect(Math.abs(at(strokeEnd - 5).x)).toBeLessThan(0.002)
+    // and the sweep is fully there in the middle
+    const mid = samples().filter((p) => p.alpha === 1)
+    expect(Math.max(...mid.map((p) => Math.abs(p.x)))).toBeGreaterThan(0.9 * HAND.strokeWidth)
+  })
+
+  it('lands softly: it dips a hair past its resting height and settles back', () => {
+    let lowest = -Infinity
+    for (let t = 1; t <= HAND.enterMs; t += 5) lowest = Math.max(lowest, at(t).y) // y is down
+    expect(lowest).toBeGreaterThan(HAND.hoverY) // went a little past
+    expect(lowest).toBeLessThan(HAND.hoverY + 0.05) // but only a little
+    expect(at(HAND.enterMs).y).toBeCloseTo(HAND.hoverY, 6) // and is exactly there at the end
   })
 
   it('fades in while it slides down and out while it slides away', () => {
@@ -55,12 +73,14 @@ describe('the slide in and out', () => {
 })
 
 describe('the strokes', () => {
-  const strokeSamples = (): HandPose[] =>
-    samples()
-      .filter((p) => p.alpha === 1 && p.visible)
-      .filter((_, i, a) => i > 2 && i < a.length - 2)
+  /** The poses during the strokes themselves (after the slide in, before the slide out), 4 ms apart. */
+  const strokeSamples = (): HandPose[] => {
+    const out: HandPose[] = []
+    for (let ms = HAND.enterMs; ms <= HAND.durationMs - HAND.exitMs; ms += 4) out.push(at(ms))
+    return out
+  }
 
-  it('goes back and forth three times across the head, never wider than a head', () => {
+  it('goes back and forth twice across the head, gently, never wider than a head', () => {
     const s = strokeSamples()
     let turns = 0
     for (let i = 2; i < s.length; i++) {
@@ -68,9 +88,9 @@ describe('the strokes', () => {
       const d2 = s[i]!.x - s[i - 1]!.x
       if (d1 * d2 < 0) turns++
     }
-    // 3 full strokes = 6 turning points (give or take the ends)
-    expect(turns).toBeGreaterThanOrEqual(5)
-    expect(turns).toBeLessThanOrEqual(7)
+    // 2 full strokes = 4 turning points (give or take the ends)
+    expect(turns).toBeGreaterThanOrEqual(3)
+    expect(turns).toBeLessThanOrEqual(5)
     for (const p of s) expect(Math.abs(p.x)).toBeLessThanOrEqual(HAND.strokeWidth + 1e-9)
   })
 
@@ -101,7 +121,7 @@ describe('smooth', () => {
       const b = at(t + 1)
       if (!a.visible && !b.visible) continue
       expect(Math.abs(b.x - a.x)).toBeLessThan(0.004)
-      expect(Math.abs(b.y - a.y)).toBeLessThan(0.004)
+      expect(Math.abs(b.y - a.y)).toBeLessThan(0.006) // the slide in (with its soft landing) is the fastest part
       expect(Math.abs(b.rot - a.rot)).toBeLessThan(0.004)
     }
   })

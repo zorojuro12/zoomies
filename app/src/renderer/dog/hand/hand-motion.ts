@@ -4,12 +4,14 @@
 // (x right, y DOWN, like the screen), so it works for any dog at any size.
 
 export const HAND = {
-  /** The whole petting: as long as the dog's happy "being petted" reaction. */
-  durationMs: 2400,
-  enterMs: 450,
-  exitMs: 450,
-  /** Back-and-forth strokes while it pets. */
-  strokes: 3,
+  /** The whole petting (the dog stays happy for about this long). */
+  durationMs: 2600,
+  enterMs: 500,
+  exitMs: 500,
+  /** Slow, calm back-and-forth strokes while it pets. */
+  strokes: 2,
+  /** The strokes start and end gently: this much of the stroke time is spent easing in / out. */
+  strokeEase: 0.18,
   /** How far each stroke sweeps to either side of the head's middle. */
   strokeWidth: 0.1,
   /** Where the hand's centre rests above the head's middle (negative = above), when pressing. */
@@ -37,9 +39,17 @@ export function createHandPose(): HandPose {
   return { x: 0, y: 0, rot: 0, alpha: 0, visible: false }
 }
 
+const clamp01 = (u: number): number => (u < 0 ? 0 : u > 1 ? 1 : u)
+/** Slow-fast-slow, 0 -> 1. */
 const smooth = (u: number): number => {
-  const t = u < 0 ? 0 : u > 1 ? 1 : u
+  const t = clamp01(u)
   return t * t * (3 - 2 * t)
+}
+/** Arrives with a tiny overshoot and settles (a soft landing), 0 -> 1. */
+const landing = (u: number): number => {
+  const t = clamp01(u) - 1
+  const c = 1.1
+  return 1 + (c + 1) * t * t * t + c * t * t
 }
 
 /** Where the hand is `tMs` milliseconds after the petting started. Outside the petting: not there. */
@@ -56,16 +66,19 @@ export function handPoseAt(tMs: number, out: HandPose): HandPose {
   const strokeEnd = HAND.durationMs - HAND.exitMs
   if (tMs < HAND.enterMs) {
     const u = tMs / HAND.enterMs
-    const e = smooth(u)
-    out.x = HAND.offX * (1 - e)
-    out.y = HAND.offY + (HAND.hoverY - HAND.offY) * e
+    out.x = HAND.offX * (1 - smooth(u))
+    out.y = HAND.offY + (HAND.hoverY - HAND.offY) * landing(u)
     out.rot = 0
-    out.alpha = u
+    out.alpha = smooth(u * 1.6)
   } else if (tMs <= strokeEnd) {
-    const phase = (2 * Math.PI * HAND.strokes * (tMs - HAND.enterMs)) / (strokeEnd - HAND.enterMs)
-    out.x = HAND.strokeWidth * Math.sin(phase)
-    out.y = HAND.hoverY - HAND.liftDepth * Math.sin(phase) * Math.sin(phase)
-    out.rot = HAND.tilt * Math.sin(phase)
+    const span = strokeEnd - HAND.enterMs
+    const w = (tMs - HAND.enterMs) / span
+    const phase = 2 * Math.PI * HAND.strokes * w
+    // the sweep eases in at the start and out at the end, so the strokes never begin or stop abruptly
+    const env = smooth(w / HAND.strokeEase) * smooth((1 - w) / HAND.strokeEase)
+    out.x = HAND.strokeWidth * env * Math.sin(phase)
+    out.y = HAND.hoverY - HAND.liftDepth * env * Math.sin(phase) * Math.sin(phase)
+    out.rot = HAND.tilt * env * Math.sin(phase)
     out.alpha = 1
   } else {
     const u = (tMs - strokeEnd) / HAND.exitMs
@@ -73,7 +86,7 @@ export function handPoseAt(tMs: number, out: HandPose): HandPose {
     out.x = HAND.offX * e
     out.y = HAND.hoverY + (HAND.offY - HAND.hoverY) * e
     out.rot = 0
-    out.alpha = 1 - u
+    out.alpha = 1 - smooth(u * 1.4 - 0.4)
   }
   return out
 }

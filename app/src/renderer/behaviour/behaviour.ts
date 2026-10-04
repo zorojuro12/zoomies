@@ -36,7 +36,7 @@ export interface BehaviourOptions {
 }
 
 const SHAKE_SPEED = 2500
-const PET_HOLD_MS = 2500
+const PET_HOLD_MS = 2700
 /** After a touch the dog is drawn at full speed for at least this long. */
 const AWAKE_MS = 1000
 /** A reaction is drawn at full speed for this long while it settles into its pose. */

@@ -55,13 +55,13 @@ describe('PetHand', () => {
     })
   })
 
-  it('has a palm, four fingers, a thumb, a cuff and a sleeve, each with an outline (white glove, dark edge)', () => {
+  it('is JUST a hand: a palm, four fingers and a thumb, each with an outline, plus a soft shadow (no arm, no cuff)', () => {
     const hand = new PetHand(new THREE.Scene())
     let meshes = 0
     hand.group.traverse((o) => {
       if (o instanceof THREE.Mesh) meshes++
     })
-    expect(meshes).toBeGreaterThanOrEqual(16) // (palm + 4 fingers + thumb + cuff + sleeve) x (fill + outline)
+    expect(meshes).toBe(13) // (palm + 4 fingers + thumb) x (fill + outline), plus the shadow
   })
 
   it("fades with the motion: opacity follows the pose's alpha", () => {
@@ -72,12 +72,17 @@ describe('PetHand', () => {
     hand.group.traverse((o) => {
       if (o instanceof THREE.Mesh) opacities.push((o.material as THREE.Material).opacity)
     })
-    expect(Math.max(...opacities)).toBeCloseTo(0.5, 2)
+    const alpha = handPoseAt(HAND.enterMs * 0.5, createHandPose()).alpha
+    expect(alpha).toBeGreaterThan(0)
+    expect(alpha).toBeLessThan(1)
+    expect(Math.max(...opacities)).toBeCloseTo(alpha, 6)
     hand.update(HAND.enterMs, ANCHOR, 100)
+    const full: number[] = []
     hand.group.traverse((o) => {
-      if (o instanceof THREE.Mesh)
-        expect((o.material as THREE.Material).opacity).toBeGreaterThan(0.9)
+      if (o instanceof THREE.Mesh) full.push((o.material as THREE.Material).opacity)
     })
+    expect(Math.max(...full)).toBeGreaterThan(0.9) // the hand itself is solid
+    expect(Math.min(...full)).toBeLessThan(0.5) // the shadow stays faint
   })
 
   it('goes away by itself when the petting is over', () => {
