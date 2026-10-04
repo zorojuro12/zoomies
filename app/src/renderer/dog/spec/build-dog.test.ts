@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { validateDogFile } from '@shared/dog-file'
 import type { DogFile, SdfShape } from '@shared/dog-file'
+import { MAX_SHAPES } from '../sdf/sdf-shader'
 import { buildDog } from './build-dog'
 import { PROPORTION_KEYS, RANGES } from './dog-spec'
 
@@ -35,29 +36,45 @@ describe('buildDog: structure', () => {
     expect(validateDogFile(dog)).toEqual([])
     expect(dog.version).toBe(1)
   })
-  it('has the 10-bone skeleton and 6 poses the motion bridge expects', () => {
+  it('has the 17-bone skeleton: 2-segment legs, a jaw and a 3-part tail', () => {
     expect(dog.bones.map((b) => b.name).sort()).toEqual(
       [
         'body',
+        'neck',
+        'head',
+        'jaw',
         'ear_l',
         'ear_r',
-        'head',
-        'leg_fl',
-        'leg_fr',
-        'leg_rl',
-        'leg_rr',
-        'neck',
-        'tail'
+        'tail1',
+        'tail2',
+        'tail3',
+        ...['fl', 'fr', 'rl', 'rr'].flatMap((l) => [`leg_${l}`, `shin_${l}`])
       ].sort()
     )
-    expect(Object.keys(dog.poses).sort()).toEqual(
-      ['headTilt', 'lie', 'playBow', 'sit', 'sleep', 'stand'].sort()
-    )
+    expect(Object.keys(dog.poses)).toContain('stand') // our own motion defines the other poses in code
   })
-  it('has unique shape ids and fits the shader limit of 32', () => {
+  it('hangs each shin from its leg at half the hip-to-paw distance (default: 50 / 2 = 25)', () => {
+    // hip-to-paw T = 2*22 (leg) + 6 (paw radius) = 50, split into two equal bones
+    expect(bone(dog, 'shin_fl').parent).toBe('leg_fl')
+    expect(bone(dog, 'shin_fl').restPos[0]).toBeCloseTo(25)
+  })
+  it('chains the tail: three equal segments of a 30-long default tail, 10 each', () => {
+    expect(bone(dog, 'tail2').parent).toBe('tail1')
+    expect(bone(dog, 'tail3').parent).toBe('tail2')
+    expect(bone(dog, 'tail2').restPos[0]).toBeCloseTo(10)
+    expect(bone(dog, 'tail3').restPos[0]).toBeCloseTo(10)
+  })
+  it('puts the jaw on a hinge under the head, with a jaw shape that follows it', () => {
+    expect(bone(dog, 'jaw').parent).toBe('head')
+    expect(shape(dog, 'jaw').bone).toBe('jaw')
+  })
+  it('puts each paw on its shin', () => {
+    expect(shape(dog, 'paw_fl').bone).toBe('shin_fl')
+  })
+  it('has unique shape ids and fits the shader shape limit', () => {
     const ids = dog.shapes.map((s) => s.id)
     expect(new Set(ids).size).toBe(ids.length)
-    expect(dog.shapes.length).toBeLessThanOrEqual(32)
+    expect(dog.shapes.length).toBeLessThanOrEqual(MAX_SHAPES)
   })
   it('is deterministic', () => {
     expect(buildDog({ earType: 'floppy', size: 1.2 })).toEqual(
@@ -80,7 +97,7 @@ describe('buildDog: the default dog matches the template, hand-worked', () => {
     expect(dog.heightPx).toBe(108)
   })
   it('tail points back and slightly down: 160° about z (placeholder literal)', () => {
-    const q = bone(dog, 'tail').restRot
+    const q = bone(dog, 'tail1').restRot
     expect(q[2]).toBeCloseTo(0.9848, 3)
     expect(q[3]).toBeCloseTo(0.1736, 3)
   })
@@ -127,21 +144,22 @@ describe('buildDog: ear and tail types', () => {
     const d = buildDog({ earType: 'floppy' })
     expect(bone(d, 'ear_l').restPos[2]).toBeCloseTo(-bone(d, 'ear_r').restPos[2])
   })
-  it('a stub tail is 35% as long as a long one (15 * 0.35 = 5.25 half length)', () => {
-    expect(shape(buildDog({ tailType: 'stub' }), 'tail').params[1]).toBeCloseTo(5.25)
-    expect(shape(buildDog({ tailType: 'long' }), 'tail').params[1]).toBeCloseTo(15)
+  it('a stub tail is 35% as long as a long one (3 segments: half length 5 -> 1.75)', () => {
+    // long tail = 30 long = 3 segments of 10 (capsule half length 5); stub = 0.35 * that = 1.75
+    expect(shape(buildDog({ tailType: 'stub' }), 'tail1').params[1]).toBeCloseTo(1.75)
+    expect(shape(buildDog({ tailType: 'long' }), 'tail1').params[1]).toBeCloseTo(5)
   })
   it('a fluffy tail is thicker than a long one', () => {
-    const fluffy = shape(buildDog({ tailType: 'fluffy' }), 'tail').params[0]!
-    const long = shape(buildDog({ tailType: 'long' }), 'tail').params[0]!
+    const fluffy = shape(buildDog({ tailType: 'fluffy' }), 'tail1').params[0]!
+    const long = shape(buildDog({ tailType: 'long' }), 'tail1').params[0]!
     expect(fluffy).toBeGreaterThan(long)
   })
   it('a curled tail is held higher than a long one', () => {
     // rotation about z by angle a points the tail along (cos a, sin a); y is down, so
     // a smaller sin(a) (more negative) means higher.
     const angle = (q: number[]): number => 2 * Math.atan2(q[2]!, q[3]!)
-    const curled = angle(bone(buildDog({ tailType: 'curled' }), 'tail').restRot)
-    const long = angle(bone(buildDog({ tailType: 'long' }), 'tail').restRot)
+    const curled = angle(bone(buildDog({ tailType: 'curled' }), 'tail1').restRot)
+    const long = angle(bone(buildDog({ tailType: 'long' }), 'tail1').restRot)
     expect(Math.sin(curled)).toBeLessThan(Math.sin(long))
   })
 })
@@ -227,10 +245,16 @@ describe('buildDog: properties that must hold for EVERY spec', () => {
       })
       it('keeps the paws on the ground (y = 0)', () => {
         // leg bones point their local x axis straight down, so going down = adding to y.
+        // body -> hip (leg bone) -> knee (shin bone) -> paw bottom, all straight down.
         const leg = bone(dog, 'leg_fl')
+        const shin = bone(dog, 'shin_fl')
         const paw = shape(dog, 'paw_fl')
         const bottom =
-          bone(dog, 'body').restPos[1] + leg.restPos[1] + paw.offset[0] + paw.params[0]!
+          bone(dog, 'body').restPos[1] +
+          leg.restPos[1] +
+          shin.restPos[0] +
+          paw.offset[0] +
+          paw.params[0]!
         expect(bottom).toBeCloseTo(0, 5)
       })
       it('has only finite numbers and positive sizes', () => {

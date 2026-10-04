@@ -2,16 +2,15 @@
 // proportions and colours come entirely from the spec (dog-spec.ts). The template is a quadruped
 // dog standing at the origin, facing +x, y DOWN, z toward the viewer (dog-file.ts frame).
 //
-// Constraint (until we write our own motion): SdfDog still borrows the placeholder's motion, which
-// drives these 10 bones and 6 poses by name — so the skeleton and poses below match the
-// placeholder's. Extra detail (eyes, nose, brows, cheeks, paws...) is added as extra SHAPES on
-// those bones. Shapes have no rotation field, so anything that must tilt (ears, tail) rides on a
-// bone's rest rotation.
+// Skeleton (17 bones): body; neck > head > jaw, ears; a 3-part tail; and four 2-segment legs
+// (leg_xx = upper, shin_xx = lower). Our own motion (dog/motion/) drives these by name. Shapes have
+// no rotation field, so anything that must tilt (ears, tail) rides on a bone's rest rotation.
 //
-// Leg geometry: a leg bone is rotated 90° about z so its local +x axis points DOWN. The leg is a
-// capsule from the bone origin down 2h (h = half length), plus the paw radius r at the end, so the
-// body must hang at  10*bodyDepth + 2h + r  above the ground — that is what puts the paws on y = 0.
-import type { Bone, DogFile, Pose, SdfShape, ShapeKind } from '@shared/dog-file'
+// Leg geometry: a leg bone is rotated 90° about z so its local +x axis points DOWN. T = the
+// hip-to-paw-bottom distance = 2h (h = half length of the leg) + paw radius r. The leg is two equal
+// bones of T/2, and the body hangs at  10*bodyDepth + T  above the ground — that is what puts the
+// paws on y = 0, and the IK in dog/motion/ aims the paw bottoms at ground points.
+import type { Bone, DogFile, SdfShape, ShapeKind } from '@shared/dog-file'
 import type { Quat, Vec3 } from '@shared/geometry'
 import { normalizeSpec, hexToLinear } from './dog-spec'
 import type { ColorKey, DogSpec } from './dog-spec'
@@ -21,46 +20,6 @@ const DEG = Math.PI / 180
 /** Rotation of `deg` degrees about z (the screen-plane axis). */
 function qz(deg: number): Quat {
   return [0, 0, Math.sin((deg * DEG) / 2), Math.cos((deg * DEG) / 2)]
-}
-
-/** The 6 poses the motion bridge understands, as bone rotations (z-rotations in degrees). */
-function buildPoses(): Record<string, Pose> {
-  return {
-    stand: {},
-    sit: {
-      body: qz(-28),
-      leg_fl: qz(118),
-      leg_fr: qz(118),
-      leg_rl: qz(10),
-      leg_rr: qz(10),
-      neck: qz(-40)
-    },
-    lie: {
-      leg_fl: qz(5),
-      leg_fr: qz(5),
-      leg_rl: qz(175),
-      leg_rr: qz(175),
-      neck: qz(-25)
-    },
-    sleep: {
-      leg_fl: qz(5),
-      leg_fr: qz(5),
-      leg_rl: qz(175),
-      leg_rr: qz(175),
-      neck: qz(15),
-      head: qz(10),
-      tail: qz(185)
-    },
-    playBow: {
-      body: qz(20),
-      leg_fl: qz(60),
-      leg_fr: qz(60),
-      neck: qz(-20),
-      tail: qz(135)
-    },
-    // Head tilted: 60° about an axis between z and x.
-    headTilt: { head: [0.2588, 0, 0.4226, 0.8682] }
-  }
 }
 
 export function buildDog(input: unknown): DogFile {
@@ -76,6 +35,10 @@ export function buildDog(input: unknown): DogFile {
   const attachY = 10 * p.bodyDepth // leg attach point below the body centre
   const bodyY = -(attachY + 2 * legHalf + pawR) // body hangs this far above the ground
   const hs = p.headSize
+  const legTotal = 2 * legHalf + pawR // hip to paw bottom
+  const legUpper = legTotal / 2 // upper and lower bones are equal
+  const tailLen = p.tailLength * (spec.tailType === 'stub' ? 0.35 : 1)
+  const tailSeg = (30 * tailLen) / 3 // 3 equal segments of a 30-long tail
 
   // ---- bones -----------------------------------------------------------------------------
   const earBase: Vec3 =
@@ -94,6 +57,8 @@ export function buildDog(input: unknown): DogFile {
       restRot: qz(-60)
     },
     { name: 'head', parent: 'neck', restPos: [24 * p.neckLength, 0, 0], restRot: qz(60) },
+    // The jaw hinges just behind the snout; rotating it about z (positive) opens the mouth.
+    { name: 'jaw', parent: 'head', restPos: [6 * hs, 8 * hs, 0], restRot: [0, 0, 0, 1] },
     { name: 'ear_l', parent: 'head', restPos: earBase, restRot: earRot },
     {
       name: 'ear_r',
@@ -102,15 +67,29 @@ export function buildDog(input: unknown): DogFile {
       restRot: earRot
     },
     {
-      name: 'tail',
+      name: 'tail1',
       parent: 'body',
       restPos: [-40 * p.bodyLength, -6 * p.bodyDepth, 0],
       restRot: qz(tailAngle)
     },
-    { name: 'leg_fl', parent: 'body', restPos: [legX, attachY, legZ], restRot: qz(90) },
-    { name: 'leg_fr', parent: 'body', restPos: [legX, attachY, -legZ], restRot: qz(90) },
-    { name: 'leg_rl', parent: 'body', restPos: [-legX, attachY, legZ], restRot: qz(90) },
-    { name: 'leg_rr', parent: 'body', restPos: [-legX, attachY, -legZ], restRot: qz(90) }
+    { name: 'tail2', parent: 'tail1', restPos: [tailSeg, 0, 0], restRot: [0, 0, 0, 1] },
+    { name: 'tail3', parent: 'tail2', restPos: [tailSeg, 0, 0], restRot: [0, 0, 0, 1] },
+    ...(
+      [
+        ['fl', legX, legZ],
+        ['fr', legX, -legZ],
+        ['rl', -legX, legZ],
+        ['rr', -legX, -legZ]
+      ] as const
+    ).flatMap(([leg, x, z]): Bone[] => [
+      { name: `leg_${leg}`, parent: 'body', restPos: [x, attachY, z], restRot: qz(90) },
+      {
+        name: `shin_${leg}`,
+        parent: `leg_${leg}`,
+        restPos: [legUpper, 0, 0],
+        restRot: [0, 0, 0, 1]
+      }
+    ])
   ]
 
   // ---- shapes ----------------------------------------------------------------------------
@@ -170,6 +149,18 @@ export function buildDog(input: unknown): DogFile {
   const noseR = 3.4 * hs * p.snoutWidth
   const snoutTipX = 8 * hs + snoutLen + 6 * hs * p.snoutWidth
   add('nose', 'sphere', 'head', [noseR], [snoutTipX - 0.4 * noseR, 4.2 * hs, 0], 1, 'nose')
+
+  // Jaw: hidden inside the snout while the mouth is closed; when the jaw bone rotates down it
+  // swings out below the snout and the mouth reads as open.
+  add(
+    'jaw',
+    'roundCone',
+    'jaw',
+    [4.5 * hs * p.snoutWidth, 3 * hs * p.snoutWidth, snoutLen * 0.9],
+    [2 * hs, 0, 0],
+    3,
+    'muzzle'
+  )
 
   // Face detail (mirrored left/right)
   for (const [side, z] of [
@@ -252,22 +243,49 @@ export function buildDog(input: unknown): DogFile {
     }
   }
 
-  // Tail: a capsule along the bone's x axis plus a coloured tip.
-  const tailLen = p.tailLength * (spec.tailType === 'stub' ? 0.35 : 1)
-  const tailHalf = 15 * tailLen
+  // Tail: three capsules along the chain (slightly tapering) plus a coloured tip.
   const tailR = (spec.tailType === 'fluffy' ? 11 : 8) * p.tailThickness
-  add('tail', 'capsule', 'tail', [tailR, tailHalf], [tailHalf, 0, 0], 4, 'tail')
-  add('tail_tip', 'sphere', 'tail', [tailR * 0.95], [2 * tailHalf, 0, 0], 3, 'tailTip')
+  for (const [i, taper] of [1, 0.95, 0.9].entries()) {
+    add(
+      `tail${i + 1}`,
+      'capsule',
+      `tail${i + 1}`,
+      [tailR * taper, tailSeg / 2],
+      [tailSeg / 2, 0, 0],
+      4,
+      'tail'
+    )
+  }
+  add('tail_tip', 'sphere', 'tail3', [tailR * 0.88], [tailSeg, 0, 0], 3, 'tailTip')
 
-  // Legs and paws. A paw is a flattened ball at the leg's end; local +x is down, local -y is forward.
+  // Legs: an upper capsule, a slimmer shin capsule and a flattened-ball paw at the end of the shin.
+  // Local +x is down; local -y is forward.
+  const shinHalf = (legUpper - 0.7 * pawR) / 2
   for (const leg of ['fl', 'fr', 'rl', 'rr'] as const) {
-    add(`leg_${leg}`, 'capsule', `leg_${leg}`, [pawR, legHalf], [legHalf, 0, 0], 4, 'legs')
+    add(
+      `leg_${leg}`,
+      'capsule',
+      `leg_${leg}`,
+      [pawR * 1.05, legUpper / 2],
+      [legUpper / 2, 0, 0],
+      4,
+      'legs'
+    )
+    add(
+      `shin_${leg}`,
+      'capsule',
+      `shin_${leg}`,
+      [pawR * 0.85, shinHalf],
+      [shinHalf, 0, 0],
+      4,
+      'legs'
+    )
     add(
       `paw_${leg}`,
       'ellipsoid',
-      `leg_${leg}`,
+      `shin_${leg}`,
       [0.9 * pawR, 1.4 * pawR, 1.15 * pawR],
-      [2 * legHalf + 0.1 * pawR, -0.35 * pawR, 0],
+      [legUpper - 0.9 * pawR, -0.35 * pawR, 0],
       3,
       'paws'
     )
@@ -294,6 +312,6 @@ export function buildDog(input: unknown): DogFile {
     bones: scaledBones,
     shapes: scaledShapes,
     coat: [],
-    poses: buildPoses()
+    poses: { stand: {} }
   }
 }
