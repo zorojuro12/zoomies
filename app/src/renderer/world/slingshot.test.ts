@@ -3,14 +3,14 @@ import { aimFromDrag, ballHit, launchVelocity, SLING } from './slingshot'
 
 describe('aimFromDrag', () => {
   it('aims right with half power when pulled left', () => {
-    const aim = aimFromDrag(500, 500, 400, 500)
+    const aim = aimFromDrag(500, 500, 450, 500)
     expect(aim).not.toBeNull()
     expect(aim!.angle).toBeCloseTo(0, 9)
     expect(aim!.power).toBeCloseTo(0.5, 9)
   })
 
   it('clamps power at 1 and aims up when pulled far down', () => {
-    const aim = aimFromDrag(500, 500, 500, 900)
+    const aim = aimFromDrag(500, 500, 500, 700)
     expect(aim).not.toBeNull()
     expect(aim!.angle).toBeCloseTo(-Math.PI / 2, 9)
     expect(aim!.power).toBe(1)
@@ -38,7 +38,7 @@ describe('launchVelocity', () => {
 })
 
 describe('ballHit', () => {
-  const ball = { x: 500, y: 500, vx: 0, vy: 0, r: 10, resting: true, contactMs: 0 }
+  const ball = { x: 500, y: 500, vx: 0, vy: 0, r: 10, resting: true, contactMs: 0, held: false }
 
   it('is true within r + grabRadiusPx', () => {
     expect(ballHit(ball, 521, 500)).toBe(true)
@@ -50,7 +50,7 @@ describe('ballHit', () => {
 })
 
 describe('SLING constants', () => {
-  it('matches the spec', () => {
-    expect(SLING).toEqual({ maxPullPx: 200, minPullPx: 8, maxLaunchSpeed: 2600, grabRadiusPx: 12 })
+  it('matches the tuned values', () => {
+    expect(SLING).toEqual({ maxPullPx: 100, minPullPx: 8, maxLaunchSpeed: 2600, grabRadiusPx: 12 })
   })
 })

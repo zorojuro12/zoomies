@@ -345,26 +345,27 @@
 - Modify: `app/src/renderer/world/world-view.ts`, `app/src/renderer/main.ts`
 
 **Interfaces:**
-- Produces: `SLING = { maxPullPx: 200, minPullPx: 8, maxLaunchSpeed: 2600, grabRadiusPx: 12 }`.
+- Produces: `SLING = { maxPullPx: 200, minPullPx: 8, maxLaunchSpeed: 2600, grabRadiusPx: 12 }`. **Tuned after a hands-on feel check (2026-10-04) to `maxPullPx: 100`** — full power at 100px of pull read better than needing almost twice that. Tests updated to match.
 - Produces: `aimFromDrag(ballX: number, ballY: number, cursorX: number, cursorY: number): { angle: number; power: number } | null` — pull = ball − cursor; `null` if |pull| < `minPullPx`; `power = min(|pull| / maxPullPx, 1)`; `angle = atan2(pullY, pullX)` (y down, so negative = up).
 - Produces: `launchVelocity(angle: number, power: number, out: { vx: number; vy: number }): void` — speed = `power · maxLaunchSpeed`.
 - Produces: `ballHit(ball: Ball, x: number, y: number): boolean` — within `r + grabRadiusPx`.
-- Host emits contract `InputEvent`s internally: `{kind: 'aim', angle, power}` while dragging, `{kind: 'launch', angle, power}` on release (P2's behaviour consumes them).
+- `Ball` gained a `held: boolean` field (Task 8) — `stepBall` is a no-op while `held`, so a dragged ball doesn't fall; the host sets it on `pointerdown`/clears it on `pointerup`.
+- Host emits contract `InputEvent`s internally: `{kind: 'aim', angle, power}` while dragging, `{kind: 'launch', angle, power}` on release (P2's behaviour consumes them). **Deferred** — `behaviour/` doesn't exist yet (P2 scope), so there's no consumer; wiring this now would be dead plumbing. `main.ts` calls `aimFromDrag`/`launchVelocity` directly instead. Revisit once P2's behaviour module exists.
 
 **Checkpoint 1: drag → aim → launch**
 
-- [ ] **Step 1: Write failing tests** — Spec: (a) ball (500,500), cursor (400,500) → `{angle: 0, power: 0.5}`; (b) cursor (500, 900) → `angle` = −π/2 ± 1e-9, `power` 1 (clamped); (c) cursor (505, 500) → `null`; (d) `launchVelocity(0, 0.5)` → `vx` 1300, `vy` 0; `launchVelocity(−π/2, 1)` → `vx` ≈ 0, `vy` −2600; (e) `ballHit(ball r 10 at (500,500), 521, 500)` true, `(523, 500)` false.
-- [ ] **Step 2: Run** — `npx vitest run src/renderer/world/slingshot.test.ts` → FAIL (module not found).
-- [ ] **Step 3: Implement** per Interfaces.
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Commit** — `npx vitest run src/renderer/world/slingshot.test.ts && git add app/src/renderer/world/slingshot.ts app/src/renderer/world/slingshot.test.ts && git commit -m "feat: slingshot aim and launch mapping"`
+- [x] **Step 1: Write failing tests** — Spec: (a) ball (500,500), cursor (400,500) → `{angle: 0, power: 0.5}`; (b) cursor (500, 900) → `angle` = −π/2 ± 1e-9, `power` 1 (clamped); (c) cursor (505, 500) → `null`; (d) `launchVelocity(0, 0.5)` → `vx` 1300, `vy` 0; `launchVelocity(−π/2, 1)` → `vx` ≈ 0, `vy` −2600; (e) `ballHit(ball r 10 at (500,500), 521, 500)` true, `(523, 500)` false.
+- [x] **Step 2: Run** — `npx vitest run src/renderer/world/slingshot.test.ts` → FAIL (module not found).
+- [x] **Step 3: Implement** per Interfaces.
+- [x] **Step 4: Run** → PASS, 8/8.
+- [x] **Step 5: Commit** — `197e9c6`
 
 **Checkpoint 2 (manual): fling the ball across the desktop (CP1 demo)**
 
-- [ ] **Step 1: Implement** — `overInteractive` now includes `ballHit` and `dragging`; `pointerdown` on the ball → dragging (ball held, `resting = false`, gravity paused while held); `pointermove` → `aimFromDrag` → draw an aim line from the ball opposite the pull (length ∝ power) in `WorldView`; `pointerup` → if aim not `null`, `launchVelocity` into the ball, else drop it in place.
-- [ ] **Step 2: Verify by hand** — Where: Windows demo laptop. Steps: `npm run dev`; with Notepad and a browser open, grab the resting ball, pull back, release; repeat towards a window; then grab the ball and release without pulling.
-  Expected: the aim line grows as you pull; on release the ball flies opposite the pull, bounces off screen edges, window tops/sides and the taskbar edge, loses energy and settles; the dog's head tracks it; clicking anywhere else still reaches the apps underneath, including while the ball is flying; a no-pull release just drops the ball; HUD fps stays at the refresh rate.
-- [ ] **Step 3: Commit** — `git add app/src/renderer/world/world-view.ts app/src/renderer/main.ts && git commit -m "feat: mouse slingshot - drag the ball, aim line, launch"`
+- [x] **Step 1: Implement** — `overInteractive` now includes `ballHit` and `dragging`; `pointerdown` on the ball → dragging (ball held, `resting = false`, gravity paused while held); `pointermove` → `aimFromDrag` → draw an aim line from the ball opposite the pull (length ∝ power) in `WorldView`; `pointerup` → if aim not `null`, `launchVelocity` into the ball, else drop it in place.
+- [x] **Step 2: Verify by hand** — Where: Windows demo laptop. Steps: `npm run dev`; with Notepad and a browser open, grab the resting ball, pull back, release; repeat towards a window; then grab the ball and release without pulling.
+  **Result (2026-10-04): PASSED.** Aim line (pink) grows as you pull; release launches the ball opposite the pull; confirmed the launch, bounce/settle, and click-through-still-works behavior. One feel issue found and fixed live: the original `maxPullPx: 200` needed almost two full drag-lengths across the screen for full power — tuned down to `100` (see Interfaces note above), re-confirmed by hand afterward.
+- [x] **Step 3: Commit** — `git add app/src/renderer/world/{slingshot.ts,ball.ts,world-view.ts} app/src/renderer/main.ts docs/plans/a-p1-overlay.md && git commit -m "feat: mouse slingshot - drag the ball, aim line, launch"`
 
 ---
 

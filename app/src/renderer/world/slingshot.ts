@@ -4,7 +4,9 @@
 import type { Ball } from './ball'
 
 export const SLING = {
-  maxPullPx: 200,
+  // Tuned down from the spec's original 200 after a hands-on feel check: full power at 100px
+  // of pull reads better than needing to drag that much further for it.
+  maxPullPx: 100,
   minPullPx: 8,
   maxLaunchSpeed: 2600,
   grabRadiusPx: 12

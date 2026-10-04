@@ -12,6 +12,8 @@ export interface Ball {
   r: number
   resting: boolean
   contactMs: number
+  /** True while the player is dragging it (Task 8): physics pauses, position is set by the host. */
+  held: boolean
 }
 
 export const BALL = {
@@ -27,7 +29,7 @@ export const BALL = {
 }
 
 export function createBall(x: number, y: number, r = 10): Ball {
-  return { x, y, vx: 0, vy: 0, r, resting: false, contactMs: 0 }
+  return { x, y, vx: 0, vy: 0, r, resting: false, contactMs: 0, held: false }
 }
 
 const scratchNormal: Point = { x: 0, y: 0 }
@@ -135,6 +137,8 @@ function resolveCollision(ball: Ball, world: World): boolean {
 }
 
 export function stepBall(ball: Ball, world: World, dtMs: number): void {
+  if (ball.held) return
+
   const dt = Math.min(dtMs, BALL.maxDtMs)
   const numSubsteps = Math.max(1, Math.ceil(dt / BALL.substepMs))
   const substepMs = dt / numSubsteps
