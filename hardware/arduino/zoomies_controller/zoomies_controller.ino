@@ -31,6 +31,14 @@ const unsigned long JOY_INTERVAL_MS = 33;     // ~30 Hz
 const int JOY_DEADBAND = 4;                   // ignore ADC noise (0..1023 scale)
 const unsigned long DEBOUNCE_MS = 20;
 const unsigned long SERIAL_WAIT_MS = 1500;    // don't hang if no computer is attached
+const unsigned long HELLO_REPEAT_MS = 2000;   // repeat HELLO this often until the app talks to us
+// The R4's USB serial doesn't reset the board when the app opens the port, and there is
+// no reliable "host connected" signal, so a boot-only HELLO would be missed. We repeat it
+// instead. true = stop after the first valid command from the app; false = repeat forever.
+// We repeat forever (false): the app only sends commands on a catch/bounce, so stopping
+// would leave the board undetectable after an app restart without a replug. The app's
+// serial reader MUST treat repeated HELLO lines as a no-op once it is connected.
+const bool STOP_HELLO_AFTER_COMMAND = false;
 const unsigned long TONE_MAX_MS = 5000;       // cap Z: so a bad line can't hold the buzzer
 const unsigned int TONE_MIN_HZ = 31;          // lowest frequency tone() supports
 const unsigned int TONE_MAX_HZ = 20000;
@@ -75,7 +83,9 @@ char lineBuf[32];
 uint8_t lineLen = 0;
 bool lineOverflow = false;
 
-bool wasConnected = false;
+// ---- HELLO announcements ------------------------------------------------------
+bool hostSpoke = false;       // true once the app has sent a valid command line
+unsigned long lastHelloAt = 0;
 
 // ---- Output helpers ---------------------------------------------------------
 void sendHello() { Serial.println(F("HELLO:zoomies:1")); }
@@ -163,9 +173,14 @@ bool parseUInt(const char* s, unsigned long& out) {
 
 void handleLine(char* line) {
   if (line[0] == 'S' && line[1] == ':') {
-    if (strcmp(line + 2, "squeak") == 0) playNotes(SQUEAK, sizeof(SQUEAK) / sizeof(Note));
-    else if (strcmp(line + 2, "chirp") == 0) playNotes(CHIRP, sizeof(CHIRP) / sizeof(Note));
-    return;  // unknown preset: ignore
+    if (strcmp(line + 2, "squeak") == 0) {
+      hostSpoke = true;
+      playNotes(SQUEAK, sizeof(SQUEAK) / sizeof(Note));
+    } else if (strcmp(line + 2, "chirp") == 0) {
+      hostSpoke = true;
+      playNotes(CHIRP, sizeof(CHIRP) / sizeof(Note));
+    }
+    return;  // unknown preset: ignore (and it doesn't count as the app talking)
   }
   if (line[0] == 'Z' && line[1] == ':') {
     char* comma = strchr(line + 2, ',');
@@ -173,6 +188,7 @@ void handleLine(char* line) {
     *comma = '\0';
     unsigned long freq, ms;
     if (!parseUInt(line + 2, freq) || !parseUInt(comma + 1, ms)) return;
+    hostSpoke = true;  // well-formed Z: line
     if (ms == 0) return;
     if (ms > TONE_MAX_MS) ms = TONE_MAX_MS;
     if (freq != 0) freq = constrain(freq, TONE_MIN_HZ, TONE_MAX_HZ);
@@ -215,7 +231,7 @@ void setup() {
   }
 
   sendHello();
-  wasConnected = (bool)Serial;
+  lastHelloAt = millis();
 
   // Report the starting state so the app doesn't have to guess.
   unsigned long now = millis();
@@ -229,13 +245,14 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  // The R4's USB serial doesn't reset the board when the app opens the port, so a
-  // HELLO sent only at boot would be missed. Say hello again whenever a host connects.
-  bool connected = (bool)Serial;
-  if (connected && !wasConnected) sendHello();
-  wasConnected = connected;
-
   readSerial();
+
+  // Keep announcing ourselves so the app can find the board whenever it opens the port.
+  if (!(STOP_HELLO_AFTER_COMMAND && hostSpoke) && now - lastHelloAt >= HELLO_REPEAT_MS) {
+    sendHello();
+    lastHelloAt = now;
+  }
+
   pollDebounced(button, now);
   pollDebounced(touch, now);
   pollJoystick(now);
