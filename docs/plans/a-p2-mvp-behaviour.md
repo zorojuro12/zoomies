@@ -104,6 +104,8 @@ attention moves toward 1 when the user is active, toward 0 when not, as an expon
 
 ### Task 7: Compose, wire, verify
 
+> **Built (branch `a/p2-wiring`, PR into `dev`):** `main.ts` creates the `Behaviour` (kill switch `ZOOMIES_BEHAVIOUR=0` / `?behaviour=0`, short timers `ZOOMIES_DEMO=1` / `?demo=1`), feeds it the activity events, the window list and the slingshot release, removes the two competing look-at calls, hides the world's ball while the dog carries it, makes a click on the dog a pet, applies the frame governor and shows the tier in the HUD (`hud.ts` gained a `power` field; `overlay-window.ts` passes the two flags from the environment). The dog's default spot is the right side of the screen, facing the room. **Still to verify on Windows** (the CP2 demo path).
+
 `behaviour.ts` composes Tasks 1-6; `main.ts` gets one small block (create it, feed `handleActivity`/`handleInput`, call `update`, honour `?behaviour=0` and `?demo=1`). Done AFTER Ansh's Tasks 8-9 land and with his OK. **Checkpoint (manual, Windows):** the CP2 demo path: launch → cursor reaction → mouse fetch (drag, release, dog runs, catches, returns) → idle → sleep (HUD shows ~5 fps) → wake and greet. Run twice without restarting.
 
 ## Cut order if time runs short

@@ -5,12 +5,14 @@ import type { FrameStats } from './frame-stats'
 export class Hud {
   private worldText = ''
   private activityText = ''
+  private powerText = ''
   private lastUpdateMs = -Infinity
 
   constructor(private readonly el: HTMLElement) {}
 
-  set(field: 'world' | 'activity', text: string): void {
+  set(field: 'world' | 'activity' | 'power', text: string): void {
     if (field === 'world') this.worldText = text
+    else if (field === 'power') this.powerText = text
     else this.activityText = text
   }
 
@@ -20,6 +22,6 @@ export class Hud {
     this.el.textContent =
       `fps ${stats.fps().toFixed(0)} · frame p95 ${stats.frameP95().toFixed(1)} ms · ` +
       `work ${stats.workAvg().toFixed(1)} / p95 ${stats.workP95().toFixed(1)} ms · ` +
-      `${this.worldText} · ${this.activityText}`
+      `${this.worldText} · ${this.activityText}${this.powerText ? ` · ${this.powerText}` : ''}`
   }
 }
