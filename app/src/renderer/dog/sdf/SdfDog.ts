@@ -11,10 +11,13 @@ import type { DogDebugView, DogRenderContext, DogView } from '@shared/dog-view'
 import type { Point, Rect } from '@shared/geometry'
 import { PlaceholderDog } from '../placeholder/placeholder-dog'
 import { MAX_SHAPES, SDF_FRAG, SDF_VERT } from './sdf-shader'
+import { restYaw, stepAngle, targetYaw } from './yaw'
 
 const KIND_INDEX: Record<ShapeKind, number> = { sphere: 0, capsule: 1, ellipsoid: 2, roundCone: 3 }
-/** Three-quarter view: how far the dog is turned toward the viewer (radians, ~25°). */
-const VIEW_YAW = (25 * Math.PI) / 180
+/** Below this speed (px/s) the dog counts as standing still and settles into its rest view. */
+const MOVING_SPEED = 20
+/** How quickly the dog swings round to a new heading (higher = snappier). */
+const TURN_RATE = 9
 /** Extra room around the dog's bounds for the ray-march quad. */
 const QUAD_MARGIN = 80
 
@@ -39,6 +42,11 @@ export class SdfDog implements DogView, DogController {
   private shadow: THREE.Mesh | null = null
   private boneNodes: THREE.Object3D[] = []
   private offsets: THREE.Matrix4[] = []
+  // Turning state: current yaw and last frame's position (for velocity).
+  private yaw = 0
+  private prevX = 0
+  private prevY = 0
+  private hasPrev = false
   private readonly uniforms = {
     uCount: { value: 0 },
     uKind: { value: new Array<number>(MAX_SHAPES).fill(0) },
@@ -119,9 +127,23 @@ export class SdfDog implements DogView, DogController {
     if (!this.root || !this.camera || !this.quad || !this.shadow) return
     this.motion.update(dtMs)
 
-    // Three-quarter view: turn the dog a little toward the viewer instead of a flat profile.
-    // (The placeholder sets rotation.y to 0 or π for facing right/left; we add the tilt.)
-    this.root.rotation.y = this.motion.getState().facing === 1 ? -VIEW_YAW : Math.PI + VIEW_YAW
+    // Turn toward where the dog is travelling (sideways = three-quarter view, up the screen =
+    // back to the viewer, down = face to the viewer); settle to the three-quarter view at rest.
+    // (The placeholder sets rotation.y to 0 or π itself; we override it after its update.)
+    const st = this.motion.getState()
+    const dt = dtMs / 1000
+    let target = restYaw(st.facing)
+    if (this.hasPrev && dt > 0) {
+      const vx = (st.x - this.prevX) / dt
+      const vy = st.pose === 'airborne' ? 0 : (st.y - this.prevY) / dt // a jump arc is not "running up"
+      if (vx * vx + vy * vy > MOVING_SPEED * MOVING_SPEED) target = targetYaw(vx, vy)
+    }
+    if (!this.hasPrev) this.yaw = target
+    else this.yaw = stepAngle(this.yaw, target, dt, TURN_RATE)
+    this.prevX = st.x
+    this.prevY = st.y
+    this.hasPrev = true
+    this.root.rotation.y = this.yaw
     this.root.updateMatrixWorld(true)
 
     // Shader needs world -> shape-local matrices.

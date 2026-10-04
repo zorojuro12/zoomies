@@ -10,7 +10,8 @@
 //
 // Flags:
 //   --url    page to load (default http://localhost:5174/preview.html — check the dev log for the port)
-//   --click  button label(s) to click in order, comma separated (e.g. "sit" or "ball,run ↔")
+//   --click  button label(s) to click in order, comma separated (e.g. "sit" or "ball,run ↔");
+//            "wait:1500" pauses 1500 ms between clicks (e.g. "walk ↑,wait:1600,walk ↓")
 //   --wait   ms to wait after the last click before the shot (default 800)
 //   --zoom   page zoom factor, makes the small dog bigger (default 1)
 //   --size   WxH of the window in CSS px (default 900x600)
@@ -56,6 +57,10 @@ app.whenReady().then(async () => {
   await sleep(600) // let the dog file load and the first frames draw
 
   for (const label of clicks) {
+    if (label.startsWith('wait:')) {
+      await sleep(Number(label.slice(5)))
+      continue
+    }
     const found = await win.webContents.executeJavaScript(
       `(() => {
         const b = [...document.querySelectorAll('#panel button')].find((x) => x.textContent === ${JSON.stringify(label)})

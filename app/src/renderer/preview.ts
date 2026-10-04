@@ -47,6 +47,16 @@ async function start(): Promise<void> {
       'run'
     )
   })
+  // Vertical walks exercise the dog's turn toward/away from the viewer (T4): up the screen
+  // shows its back, down shows its face. Slow on purpose so you can inspect the angle.
+  button('walk ↑', () => {
+    const s = dog.getState()
+    void dog.moveTo(s.x, groundY() - 140, 'walk')
+  })
+  button('walk ↓', () => {
+    const s = dog.getState()
+    void dog.moveTo(s.x, groundY(), 'walk')
+  })
   button('jump', () => {
     const s = dog.getState()
     void dog.jumpTo(s.x + 160 * s.facing, groundY(), { apexPx: 120 })
