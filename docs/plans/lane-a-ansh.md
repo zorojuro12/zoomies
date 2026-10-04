@@ -70,13 +70,15 @@
 - **Done when (CP2):** demo path (launch → cursor → mouse fetch → idle → sleep → wake) on Windows with the real dog, ≥ 60 FPS active, sleep FPS drop visible. **Verified on Windows, 2026-10-04, twice in the same running session without restarting** — full cycle (launch/fetch/idle/sleep/wake) held both times. Promote + tag `mvp`.
 
 ## P3 — Shoulds
-- [ ] **Serial (with Abel):** `serialport`, auto-detect the port by `HELLO:zoomies:1`, parse §3.7, reconnect on unplug; map to `InputEvent`s — joystick pull-back = `aim`, release past threshold or button = `launch`, touch = `pet`, button tap = `call`, button hold = `pushToTalk`. Buzzer: `S:squeak` on catch, `S:chirp` per bounce.
+- [x] **Serial (with Abel):** `serialport`, auto-detect the port by `HELLO:zoomies:1`, parse §3.7, reconnect on unplug; map to `InputEvent`s — joystick pull-back = `aim`, release past threshold or button = `launch`, touch = `pet`, button tap = `call`, button hold = `pushToTalk`. Buzzer: `S:squeak` on catch, `S:chirp` per bounce.
   **Note (2026-10-04, from Abel's `c/controller` journal):** the merged sketch sends `HELLO:zoomies:1` every 2s, repeating forever (not just once on boot/connect) — the reader must treat a repeat as a no-op, not re-run port-detect/reconnect logic each time it arrives.
+  **Done (2026-10-04):** `main/hardware/` (Daniel, PRs #28/#32/#33) + launch fix #40; verified end to end on Windows with the real board on COM4 (aim/launch, call, push-to-talk hold, touch pet + pet hand, squeak/chirp, unplug/replug). This board needs `ZOOMIES_INVERT_Y=1` (see `CLAUDE.md`).
 - [ ] **Bounce prediction + mid-air catch:** simulate the ball forward against the world SDF → landing point; if the path crosses a reachable point, `jumpTo` an intercept and catch.
 - [ ] **Window terrain:** platforms from window top edges + taskbar; route with walks + `jumpTo` arcs; ride a dragged window (follow its delta, jump off on large acceleration); fall + stumble when the window under the dog closes; **peek from behind** (dog behind a higher-z window is masked by that window's rect, peeks at the edge).
 - [ ] **ElevenLabs L2:** push-to-talk records mic → STT → `command` event; ears perk on press; clickable command buttons as fallback.
-- [ ] **Gemini G3:** free text → function-call to a dog action; fixed command list as fallback.
-- [ ] **Keys:** load `.env` in the main process with Node's built-in `process.loadEnvFile()` (no extra package); never pass keys to the renderer.
+  **Built (Daniel, #36):** mic only while held (button / on-screen hold / space), 10 s cap, ElevenLabs STT → D2 router; command bar is the fallback. Verified with a real clip on Mac. **Still to verify: the real mic on Windows** (overlay is `focusable:false` — check the permission).
+- [x] **Gemini G3:** free text → function-call to a dog action; fixed command list as fallback. `main/services/gemini-command.ts` (Daniel, #35), `gemini-3.8-flash` (override `GEMINI_MODEL`), word list `behaviour/commands.ts` when offline; seven commands + head tilt when not understood.
+- [x] **Keys:** load `.env` in the main process with Node's built-in `process.loadEnvFile()` (no extra package); never pass keys to the renderer. Done with a tiny tested reader instead (`main/services/dotenv.ts`, no dependency, never overrides an existing variable); keys stay in main.
 - [ ] **Gemini G2:** load the personality profile (generated once from the photo) into needs-model parameters; window-herding trick for the Aussie.
 - **Hand-off rule:** if behind at mid-P3, hand L2/G2/G3 to Daniel once the dog is stable.
 - **Tests:** serial parser (good/bad lines); landing prediction vs simulated result; platform graph from window rects; command mapping.
