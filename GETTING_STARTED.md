@@ -49,13 +49,13 @@ git checkout dev          # dev is where all work merges; never work on main
 ```bash
 cd app
 npm install               # run separately on every machine/OS — never copy node_modules
-npm run dev               # opens a dark window with an orange dot and a frame-time readout
+npm run dev               # opens a window with a placeholder dog — click to make it run there
 ```
 
 If that window appears, you're set. Then check the rest once:
 
 ```bash
-npm test                  # unit tests (Vitest) — should say 2 passed
+npm test                  # unit tests (Vitest) — should say 18 passed
 npm run typecheck
 npm run lint
 ```
@@ -83,7 +83,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 - Set up your own Claude workflow; the repo's shared `journal` skill is in `.claude/skills/journal/`.
-- Start the SDF / skeleton spike in your preview page once contracts are merged.
+- Your preview page already exists: with `npm run dev` running, open `/preview.html` on the dev server URL it prints (e.g. `http://localhost:5173/preview.html`) in a browser.
 
 **Abel (Lane C)** — some of this doesn't need the code at all, so start it right away:
 - ⚡ Open Huawei's Google Drive folder (link in the challenge brief); if there's a larger dog photo, save it as `assets/photo/dog.jpeg`.

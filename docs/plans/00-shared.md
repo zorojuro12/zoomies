@@ -50,14 +50,25 @@ Phases are relative — each ends at a checkpoint (§5). Don't start the next ph
 - [ ] **Ansh → Abel:** zip the trimmed `.claude/` and send it; Abel unzips into his clone (it's gitignored).
 - [ ] **Daniel:** set up his own workflow; read the kickoff journal + `CLAUDE.md`. Add the journal skill to his flow (already in the repo).
 
-### 2.4 Contracts + stubs — all three, 30–45 min, one PR: `a/contracts`
-Write §3 into `app/src/shared/`, with the stubs listed. Merge before anyone branches for P1.
+### 2.4 Contracts + stubs — pre-drafted, then reviewed together
+**Pre-drafted 2026-10-03 and merged into `dev`** (`a/contracts`): every contract in §3 as code in `app/src/shared/`, plus the stubs. The session with all three is now a ~20-minute **review**: read the files, agree or change them via small PRs. Then everyone branches for P1.
+
+| Stub | Where |
+|---|---|
+| `StubOsLayer` | `app/src/main/os/stub-os-layer.ts` |
+| `PlaceholderDog` (DogView + DogController) | `app/src/renderer/dog/placeholder/placeholder-dog.ts` |
+| Placeholder dog file (dog-shaped, 12 shapes, 6 poses) | `assets/dog/placeholder.dog.json` |
+| `StubAudio` | `app/src/renderer/audio/stub-audio.ts` |
+| App host showing the placeholder dog | `app/src/renderer/main.ts` (+ `host/scene.ts`) |
+| Dog preview page (Lane B harness) | `app/src/renderer/preview.html` → open `/preview.html` from the `npm run dev` server in a browser |
 
 ---
 
 ## 3. Contracts (`app/src/shared/`)
 
 Changing anything here = a small PR everyone sees. Inside a lane, change freely.
+
+> **The code in `app/src/shared/` is now the source of truth.** The snippets below are the original design. Differences in the code: `geometry.ts` holds `Point`/`Rect`/`Facing`/`Vec3`/`Quat`; `SdfShape` gained a `color`; the **dog-local frame** is defined in `dog-file.ts` (pixels, origin between the paws, +x forward, **y down**, +z toward the viewer); `dog-file.ts` has `validateDogFile()` and a JSON Schema twin `dog-file.schema.json` for the pipeline; `serial.ts` includes the line parser/formatter (tested); `audio.ts` has the `SOUND_NAMES` list and an `AudioPlayer` interface.
 
 ### 3.1 Coordinates (decided once, used everywhere)
 - **World units = desktop pixels** (CSS/DIP px), origin at the top-left of the primary display, **x right, y down** — the same space as window rects and the cursor.
@@ -144,6 +155,14 @@ export type InputEvent =
 ### 3.8 `ipc.ts` and `audio.ts`
 - `ipc.ts`: one map of channel names → payload types (`os:windows`, `os:activity`, `input:event`, `serial:status`, `services:*`). Nothing else uses raw strings.
 - `audio.ts`: `playSound(name: SoundName, opts?: { pan?: number; gain?: number })`, `SoundName` = the file stems in `assets/sounds/` (e.g. `bark_happy_1`). **Abel owns this module** (playback, variants, panning) and the sound list defines the names; Ansh calls it from behaviour. Stub: a no-op that logs the sound name.
+
+---
+
+### 3.9 `landmarks.ts` — Abel produces, Daniel consumes
+`assets/views/landmarks.json`: per view (`front` = the photo, `side_sit`, `side_stand`, `back`), a map of landmark name → `[x, y]` pixel coordinates (origin top-left), plus `image_size` per view. Only points visible in that view. The 28 names are `LANDMARK_NAMES` in `app/src/shared/landmarks.ts`.
+
+### 3.10 `assets.ts` — how the app loads files from `assets/`
+The repo-root `assets/` folder is the renderer's public directory (`app/electron.vite.config.ts`), copied into the build. **Always load with `assetUrl('<path under assets/>')`** (e.g. `assetUrl('dog/aussie.dog.json')` → `./dog/aussie.dog.json`) so it works in `npm run dev` and in the packaged app. Common paths are in `ASSETS`.
 
 ---
 

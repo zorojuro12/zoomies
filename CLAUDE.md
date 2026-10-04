@@ -70,12 +70,12 @@ Pipeline (`pipeline/`): Python 3.11+ venv, `pip install -r requirements.txt`, `p
 |---|---|
 | `app/src/main/` | Electron main process (`index.ts`); `os/`, `hardware/`, `services/` for Lane A |
 | `app/src/preload/` | IPC bridge exposed to the renderer |
-| `app/src/renderer/` | `index.html` + `main.ts` (render host); `dog/` (B), `world/`, `behaviour/` (A), `audio/` (C), `ui/` |
-| `app/src/shared/` | Contracts and constants imported as `@shared/...` by main, preload and renderer |
+| `app/src/renderer/` | `index.html` + `main.ts` (app host), `host/` (render setup), `preview.html` + `preview.ts` (dog preview, B); `dog/` (B — `dog/placeholder/` is the stand-in), `world/`, `behaviour/` (A), `audio/` (C), `ui/` |
+| `app/src/shared/` | **Contracts** (source of truth, `docs/plans/00-shared.md` §3) imported as `@shared/...` by main, preload and renderer |
 | `pipeline/` | Python reconstruction pipeline (B) |
 | `hardware/arduino/zoomies_controller/` | Controller sketch (C) |
 | `scripts/` | Helper tools (C) |
-| `assets/` | `photo/`, `views/`, `dog/`, `sounds/` |
+| `assets/` | `photo/`, `views/`, `dog/`, `sounds/` — served to the renderer; load with `assetUrl()` from `@shared/assets` |
 | `docs/`, `journal/` | PRD, stack, plans, workflow guide, session journal |
 
 ## Git
