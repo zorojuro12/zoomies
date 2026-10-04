@@ -8,6 +8,7 @@ import type { Needs } from './needs'
 import { wants } from './needs'
 import type { UserState } from './activity'
 import type { DogExtras } from './dog-extras'
+import type { FpsTier } from './fps'
 
 export interface Ctx {
   clockMs: number
@@ -47,6 +48,10 @@ export interface Reaction {
   minHoldMs: number
   /** What the needs model should think the dog is doing meanwhile. */
   doing: 'active' | 'resting' | 'sleeping'
+  /** How often it needs redrawing once it has settled in (see fps.ts). */
+  fps: FpsTier
+  /** False while it is still moving into place (it is drawn at full speed until then). */
+  settled?(): boolean
   eligible(c: Ctx): boolean
   start(c: Ctx, e: Env): void
   update(dtMs: number, c: Ctx, e: Env): boolean
@@ -70,6 +75,7 @@ const idle: Reaction = {
   cooldownMs: 0,
   minHoldMs: 0,
   doing: 'active',
+  fps: 'rest',
   eligible: (c) => c.user === 'idle',
   start(c, e) {
     void e.dog.setPose('sit')
@@ -86,6 +92,7 @@ const sleep: Reaction = {
   cooldownMs: 0,
   minHoldMs: 0,
   doing: 'sleeping',
+  fps: 'sleep',
   eligible: (c) => c.user === 'asleep',
   start(_c, e) {
     void e.dog.setPose('sleep')
@@ -107,6 +114,7 @@ const greet = ((): Reaction => {
     cooldownMs: 0,
     minHoldMs: 3000,
     doing: 'active',
+    fps: 'full',
     eligible: (c) => c.returnedPending,
     start(_c, e) {
       t = 0
@@ -146,6 +154,8 @@ function lieBeside(id: 'typing' | 'focus', doze: boolean): Reaction {
     cooldownMs: 0,
     minHoldMs: 1500,
     doing: 'resting',
+    fps: 'rest',
+    settled: () => lying,
     eligible: (c) => c.user === id,
     start(c, e) {
       lying = false
@@ -188,6 +198,7 @@ const backspace = ((): Reaction => {
     cooldownMs: 20000,
     minHoldMs: 1500,
     doing: 'active',
+    fps: 'full',
     eligible: (c) => c.backspaceSpam,
     start(_c, e) {
       t = 0
@@ -214,6 +225,7 @@ const rest = ((): Reaction => {
     cooldownMs: 0,
     minHoldMs: 0,
     doing: 'resting',
+    fps: 'rest',
     // worn out below 25%, and it stays down until it is back to 60%
     eligible: (c) => (on ? c.needs.energy < 0.6 : wants(c.needs).rest),
     start(_c, e) {
@@ -241,6 +253,7 @@ const hover: Reaction = {
   cooldownMs: 0,
   minHoldMs: 0,
   doing: 'active',
+  fps: 'full',
   eligible: (c) => c.cursorOverMs >= 400,
   start(_c, e) {
     e.extras.setMood('happy', 0.8)
@@ -264,6 +277,7 @@ const shake = ((): Reaction => {
     cooldownMs: 15000,
     minHoldMs: 2500,
     doing: 'active',
+    fps: 'full',
     eligible: (c) => c.cursorFastMs >= 400 && Math.abs(c.cursorX - c.dogX) > 150,
     start(c, e) {
       t = 0

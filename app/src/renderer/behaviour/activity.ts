@@ -132,9 +132,11 @@ export class ActivityClassifier {
       this.rateKeys >= t.backspaceMinKeysPerSec &&
       this.rateRatio > t.backspaceRatio
 
+    // many small steps add up with rounding error (80 x 0.1 s is 7.999999999999993): allow a hair
+    const idle = s.idleSec + 1e-6
     let user: UserState
-    if (s.idleSec >= t.asleepSec) user = 'asleep'
-    else if (s.idleSec >= t.idleSec) user = 'idle'
+    if (idle >= t.asleepSec) user = 'asleep'
+    else if (idle >= t.idleSec) user = 'idle'
     else if (this.focusMs >= t.focusHoldSec * 1000) user = 'focus'
     else if (this.fastMs >= t.typingHoldSec * 1000) user = 'typing'
     else user = 'active'

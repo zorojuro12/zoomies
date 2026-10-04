@@ -436,6 +436,135 @@ describe('who is in charge (the arbiter at work)', () => {
   })
 })
 
+describe('how often it needs to be drawn (the frame-rate tier)', () => {
+  it('an active user, nothing going on: full speed', () => {
+    const h = mk()
+    activeFor(h, 3)
+    expect(h.b.fpsTier()).toBe('full')
+  })
+
+  it('sitting idle: full speed while it settles into the pose, then resting speed', () => {
+    const h = mk()
+    idleFor(h, 8)
+    expect(h.b.reaction).toBe('idle')
+    expect(h.b.fpsTier()).toBe('full')
+    idleFor(h, 2)
+    expect(h.b.fpsTier()).toBe('rest')
+  })
+
+  it('asleep: sleep speed (once it has settled)', () => {
+    const h = mk()
+    idleFor(h, 20)
+    expect(h.b.fpsTier()).toBe('full')
+    idleFor(h, 2)
+    expect(h.b.fpsTier()).toBe('sleep')
+  })
+
+  it('touching the mouse or keyboard wakes it AT ONCE: full speed before the next (slow) update even runs', () => {
+    const h = mk()
+    idleFor(h, 25)
+    expect(h.b.fpsTier()).toBe('sleep')
+    mouse(h, 400, 300) // no frame has run since
+    expect(h.b.fpsTier()).toBe('full')
+
+    const g = mk()
+    idleFor(g, 25)
+    g.b.handleActivity({ kind: 'typing', keysPerSec: 3, backspaceRatio: 0 })
+    expect(g.b.fpsTier()).toBe('full')
+  })
+
+  it('a mouse event with speed 0 (the cursor is just sitting there) does not wake it', () => {
+    const h = mk()
+    idleFor(h, 25)
+    h.b.handleActivity({ kind: 'mouse', x: 5, y: 5, speed: 0 })
+    h.b.handleActivity({ kind: 'typing', keysPerSec: 0, backspaceRatio: 0 })
+    expect(h.b.fpsTier()).toBe('sleep')
+  })
+
+  it('stays awake for a second after the touch, then the usual rules apply again', () => {
+    const h = mk()
+    idleFor(h, 25)
+    mouse(h, 400, 300)
+    expect(h.b.fpsTier()).toBe('full')
+    activeFor(h, 3, 400) // the greeting plays, the user stays active: nothing slow
+    expect(h.b.fpsTier()).toBe('full')
+  })
+
+  it('fetching: full speed, even if the user has gone idle or to sleep', () => {
+    const h = mk()
+    idleFor(h, 25)
+    h.ball.resting = false
+    h.ball.vx = 700
+    h.ball.vy = -900
+    h.b.handleInput({ kind: 'launch', angle: -1, power: 1 })
+    for (let i = 0; i < 60; i++) {
+      run(h, 0.25)
+      expect(h.b.fpsTier()).toBe('full')
+      if (!h.b.fetch.active) break
+    }
+  })
+
+  it('lying beside you while you type: full speed while it walks over, resting speed once it is down', () => {
+    const h = mk()
+    h.b.setWindows([win(100, 300)]) // the floor spot is far from the dog at x = 1500
+    type(h, 4, 3)
+    expect(h.b.reaction).toBe('typing')
+    expect(h.b.fpsTier()).toBe('full') // still walking over
+    type(h, 12, 3) // arrives (about 8 s of walking) and settles
+    expect(h.dog.pose).toBe('lie')
+    type(h, 3, 3)
+    expect(h.b.fpsTier()).toBe('rest')
+  })
+
+  it('a pet, a greeting or a cursor-shake: full speed', () => {
+    const h = mk()
+    h.b.handleInput({ kind: 'pet', source: 'mouse' })
+    run(h, 0.5)
+    expect(h.b.fpsTier()).toBe('full')
+
+    const g = mk()
+    for (let i = 0; i < 8; i++) {
+      g.b.setCursor(300, 400, 3000)
+      run(g, 0.1)
+    }
+    expect(g.b.reaction).toBe('shake')
+    expect(g.b.fpsTier()).toBe('full')
+  })
+})
+
+describe('long frames (the slow rate): time still passes at the right speed', () => {
+  it('one 200 ms update counts as 200 ms, not 100: eight idle seconds at 5 frames a second are eight seconds', () => {
+    const h = mk()
+    for (let i = 0; i < 40; i++) {
+      h.b.update(200)
+      h.dog.update(200)
+    }
+    expect(h.b.activity.state.user).toBe('idle') // demo idle = 8 s
+    expect(h.b.reaction).toBe('idle')
+  })
+
+  it('a single huge update (a long stall) counts as at most a second', () => {
+    const h = mk()
+    h.b.update(600_000)
+    expect(h.b.activity.state.idleSec).toBeLessThan(1.1)
+  })
+
+  it('one 200 ms update does the same as two 100 ms ones (the needs too)', () => {
+    const a = mk()
+    const b = mk()
+    a.b.needs.energy = 0.5
+    b.b.needs.energy = 0.5
+    for (let i = 0; i < 25; i++) {
+      a.b.update(200)
+      b.b.update(100)
+      b.b.update(100)
+    }
+    expect(a.b.needs.boredom).toBeCloseTo(b.b.needs.boredom, 6)
+    expect(a.b.needs.attention).toBeCloseTo(b.b.needs.attention, 6)
+    expect(a.b.activity.state.idleSec).toBeCloseTo(b.b.activity.state.idleSec, 6)
+  })
+})
+
 describe('real timing', () => {
   it('with the real thresholds, 59 s idle does nothing and 60 s sits', () => {
     const h = mk({ timing: BEHAVIOUR_TIMING })

@@ -239,6 +239,21 @@ describe('break due (50 minutes of working)', () => {
   })
 })
 
+describe('rounding (many small steps add up to the right time)', () => {
+  it('eighty steps of 100 ms are exactly 8 s: idle at the demo threshold, not a hair before', () => {
+    const { c } = make(DEMO_TIMING)
+    for (let i = 0; i < 79; i++) c.update(100, 12)
+    expect(c.state.user).toBe('active')
+    c.update(100, 12)
+    expect(c.state.user).toBe('idle')
+  })
+  it('two hundred steps of 100 ms are 20 s: asleep at the demo threshold', () => {
+    const { c } = make(DEMO_TIMING)
+    for (let i = 0; i < 200; i++) c.update(100, 12)
+    expect(c.state.user).toBe('asleep')
+  })
+})
+
 describe('forceBreakDue (demo button)', () => {
   it('makes the break due at once, and breakHandled still clears it', () => {
     const { c, notes } = make()

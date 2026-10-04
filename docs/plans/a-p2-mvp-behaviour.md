@@ -94,6 +94,8 @@ attention moves toward 1 when the user is active, toward 0 when not, as an expon
 
 ### Task 5: Adaptive FPS
 
+> **Built as (Daniel agreed):** three speeds, not two. `full` = every screen refresh (never capped: the plan says at least 60 FPS when active, and a 60 cap on a 144 Hz screen would judder); `rest` = 30 fps (sitting idle, lying beside you while you type); `sleep` = 5 fps. `FrameGovernor.shouldRun(nowMs, tier)` decides per screen refresh; `Behaviour.fpsTier()` says which tier. A touch wakes a sitting or sleeping dog at once (full speed before the next slow update runs). `Behaviour.update` now takes long frames in 100 ms pieces so time passes at the right speed at 5 fps. Seen in the demo readout: `/preview.html?spec=aussie&behaviour=1` then `fall asleep` / `come back`.
+
 `fps.ts` + the host loop: awake → 60, asleep → ~5 (the loop skips frames, the dog is not updated, HUD shows the target and real fps). Any input wakes it on the next event, not the next slow frame. Tests: target per state; wake latency (an event while asleep requests an immediate frame).
 
 ### Task 6: Sound cues

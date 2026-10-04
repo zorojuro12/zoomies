@@ -13,6 +13,8 @@ import { mountSpecEditor } from './ui/editor/spec-editor'
 import { createRenderContext, loadJson } from './host/scene'
 import { Behaviour } from './behaviour/behaviour'
 import { Fetch } from './behaviour/fetch'
+import { FrameGovernor } from './behaviour/fps'
+import type { FpsTier } from './behaviour/fps'
 import { BEHAVIOUR_TIMING, DEMO_TIMING } from './behaviour/timing'
 import { createBall, stepBall } from './world/ball'
 import type { Ball } from './world/ball'
@@ -138,6 +140,8 @@ async function start(): Promise<void> {
   // ?fetch=1: the fetch demo. A floor, a ball you can drag back and let go (the slingshot), and
   // the dog fetches it (P2 Task 3). Works here on a Mac, no overlay needed.
   let tickFetch: ((dtMs: number) => void) | null = null
+  // In the personality demo the dog asks how often it needs drawing (full / resting / asleep).
+  let tierOf: (() => FpsTier) | null = null
   // The fetch demo starts with the dog at the right side of the screen (its default spot).
   const DOG_HOME = 0.85
   const BALL_HOME = 0.6
@@ -238,6 +242,7 @@ async function start(): Promise<void> {
       ball.resting = true
     })
     if (behaviour) {
+      tierOf = () => behaviour.fpsTier()
       // a pretend "active window" so typing has somewhere to lie down beside
       const demoWindow = {
         id: 'demo',
@@ -332,7 +337,22 @@ async function start(): Promise<void> {
   let frameCount = 0
 
   let last = performance.now()
+  const governor = new FrameGovernor()
+  let framesThisSecond = 0
+  let actualFps = 0
+  let fpsClock = performance.now()
   const frame = (now: number): void => {
+    const tier = tierOf ? tierOf() : 'full'
+    if (!governor.shouldRun(now, tier)) {
+      requestAnimationFrame(frame) // asleep or resting: skip this screen refresh
+      return
+    }
+    framesThisSecond++
+    if (now - fpsClock >= 1000) {
+      actualFps = framesThisSecond
+      framesThisSecond = 0
+      fpsClock = now
+    }
     let dt = now - last
     last = now
     if (freezeAfter > 0) dt = frameCount++ < freezeAfter ? 1000 / 60 : 0
@@ -340,7 +360,8 @@ async function start(): Promise<void> {
     dog.update(dt)
     ctx.renderer.render(ctx.scene, ctx.camera)
     const s = dog.getState()
-    status.textContent = `${dt.toFixed(1)} ms · pose ${s.pose} · facing ${s.facing}${fetchState ? ` · ${fetchState}` : ''}`
+    const fpsText = tierOf ? ` · ${actualFps} fps (${tier})` : ''
+    status.textContent = `${dt.toFixed(1)} ms · pose ${s.pose} · facing ${s.facing}${fpsText}${fetchState ? ` · ${fetchState}` : ''}`
     requestAnimationFrame(frame)
   }
   requestAnimationFrame(frame)

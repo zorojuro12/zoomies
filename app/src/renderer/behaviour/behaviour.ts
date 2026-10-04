@@ -13,6 +13,7 @@ import type { ActivityNote } from './activity'
 import { Arbiter, chooseLook } from './arbiter'
 import { asExtras } from './dog-extras'
 import type { DogExtras } from './dog-extras'
+import type { FpsTier } from './fps'
 import { Fetch } from './fetch'
 import type { FetchNote } from './fetch'
 import { applyNeedsEvent, createNeeds, stepNeeds, wants } from './needs'
@@ -36,6 +37,13 @@ export interface BehaviourOptions {
 
 const SHAKE_SPEED = 2500
 const PET_HOLD_MS = 2500
+/** After a touch the dog is drawn at full speed for at least this long. */
+const AWAKE_MS = 1000
+/** A reaction is drawn at full speed for this long while it settles into its pose. */
+const SETTLE_MS = 1500
+/** One update counts as at most this long (a stall must not teleport the dog); longer is taken in 100 ms pieces. */
+const MAX_UPDATE_MS = 1000
+const STEP_MS = 100
 
 export class Behaviour {
   readonly needs: Needs = createNeeds()
@@ -64,6 +72,7 @@ export class Behaviour {
   private bringReason: 'none' | 'break' | 'bored' = 'none'
   private bringCooldownUntil = 0
   private lookingAtCursor = false
+  private awakeMs = 0
 
   private readonly cursor = {
     x: 0,
@@ -127,12 +136,18 @@ export class Behaviour {
   // ---- inputs from the host ----------------------------------------------------------------
 
   handleActivity(e: ActivityEvent): void {
+    // Real input wakes a dog that was sitting idle or asleep AT ONCE: full speed before the next,
+    // possibly slow, update runs. (Input while it is already up and about changes nothing.)
+    const u = this.activity.state.user
+    const input = (e.kind === 'mouse' && e.speed > 0) || (e.kind === 'typing' && e.keysPerSec > 0)
+    if (input && (u === 'idle' || u === 'asleep')) this.awakeMs = AWAKE_MS
     this.activity.onEvent(e)
     if (e.kind === 'mouse') this.setCursor(e.x, e.y, e.speed)
     else if (e.kind === 'typing' && Number.isFinite(e.keysPerSec)) this.keysPerSec = e.keysPerSec
   }
 
   handleInput(e: InputEvent): void {
+    this.awakeMs = AWAKE_MS
     if (e.kind === 'launch') {
       this.fetch.launch()
     } else if (e.kind === 'pet') {
@@ -164,6 +179,7 @@ export class Behaviour {
 
   /** The user did something to the dog directly (clicked it...): reactions wait for a moment. */
   userCommand(holdMs = 5000): void {
+    this.awakeMs = AWAKE_MS
     if (this.arbiter.request('command', 'user', 0, holdMs)) this.commandHoldMs = holdMs
   }
 
@@ -184,8 +200,37 @@ export class Behaviour {
 
   // ---- once a frame -------------------------------------------------------------------------
 
+  /**
+   * How often the host needs to draw right now (see fps.ts): full speed when anything is going on,
+   * resting speed when it has settled sitting or lying down, sleep speed when it is asleep.
+   */
+  fpsTier(): FpsTier {
+    if (this.awakeMs > 0 || this.fetch.active) return 'full'
+    const o = this.arbiter.owner
+    if (o === 'reaction' && this.current) {
+      const r = this.current
+      const settled = this.arbiter.heldMs >= SETTLE_MS && (r.settled?.() ?? true)
+      return settled ? r.fps : 'full'
+    }
+    return 'full'
+  }
+
+  /** Once a frame. A long frame (the slow rates) is taken in 100 ms pieces so time passes at the right speed. */
   update(dtMs: number): void {
-    const dt = Number.isFinite(dtMs) && dtMs > 0 ? Math.min(dtMs, 100) : 0
+    let left = Number.isFinite(dtMs) && dtMs > 0 ? Math.min(dtMs, MAX_UPDATE_MS) : 0
+    if (left <= 0) {
+      this.step(0)
+      return
+    }
+    while (left > 1e-9) {
+      const chunk = Math.min(left, STEP_MS)
+      this.step(chunk)
+      left -= chunk
+    }
+  }
+
+  private step(dt: number): void {
+    this.awakeMs = Math.max(0, this.awakeMs - dt)
     this.clockMs += dt
     this.tickCursor(dt)
     this.activity.update(dt, this.hour())
