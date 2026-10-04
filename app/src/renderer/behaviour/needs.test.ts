@@ -27,25 +27,25 @@ describe('createNeeds', () => {
 })
 
 describe('energy', () => {
-  it('fetching drains 0.04 per second: 10 s from 1 -> 0.6', () => {
+  it('fetching drains 0.01 per second: 10 s from 1 -> 0.9', () => {
     const n = make(1, 0, 0.5)
     run(n, 10, 'fetching', true)
-    expect(n.energy).toBeCloseTo(0.6, 6)
+    expect(n.energy).toBeCloseTo(0.9, 6)
   })
-  it('resting recovers 0.02 per second: 10 s from 0.5 -> 0.7', () => {
+  it('resting recovers 0.01 per second: 10 s from 0.5 -> 0.6', () => {
     const n = make(0.5, 0, 0.5)
     run(n, 10, 'resting', false)
-    expect(n.energy).toBeCloseTo(0.7, 6)
+    expect(n.energy).toBeCloseTo(0.6, 6)
   })
-  it('sleeping recovers 0.05 per second and clamps at 1: 20 s from 0.5 -> 1', () => {
+  it('sleeping recovers 0.03 per second and clamps at 1: 20 s from 0.5 -> 1', () => {
     const n = make(0.5, 0, 0.5)
     run(n, 20, 'sleeping', false)
     expect(n.energy).toBe(1)
   })
-  it('just being up and about recovers a little: 0.005 per second, 10 s from 0.5 -> 0.55', () => {
+  it('just being up and about recovers a little: 0.002 per second, 10 s from 0.5 -> 0.52', () => {
     const n = make(0.5, 0, 0.5)
     run(n, 10, 'active', true)
-    expect(n.energy).toBeCloseTo(0.55, 6)
+    expect(n.energy).toBeCloseTo(0.52, 6)
   })
   it('never goes below 0', () => {
     const n = make(0.1, 0, 0.5)
@@ -55,15 +55,15 @@ describe('energy', () => {
 })
 
 describe('boredom', () => {
-  it('rises 0.005 per second when the user is idle: 100 s from 0 -> 0.5', () => {
+  it('rises 0.002 per second when the user is idle: 100 s from 0 -> 0.2', () => {
     const n = make(1, 0, 0.5)
     run(n, 100, 'active', false)
-    expect(n.boredom).toBeCloseTo(0.5, 6)
+    expect(n.boredom).toBeCloseTo(0.2, 6)
   })
-  it('rises only 0.0015 per second when the user is active: 100 s from 0 -> 0.15', () => {
+  it('rises only 0.0006 per second when the user is active: 100 s from 0 -> 0.06', () => {
     const n = make(1, 0, 0.5)
     run(n, 100, 'active', true)
-    expect(n.boredom).toBeCloseTo(0.15, 6)
+    expect(n.boredom).toBeCloseTo(0.06, 6)
   })
   it('fetching soothes it, 0.02 per second: 10 s from 0.5 -> 0.3', () => {
     const n = make(1, 0.5, 0.5)
@@ -169,7 +169,7 @@ describe('robustness', () => {
   it('one enormous dt counts as at most 5 s (a laptop wake must not drain the dog in one step)', () => {
     const n = make(1, 0, 0.5)
     stepNeeds(n, 1e9, 'fetching', true)
-    expect(n.energy).toBeCloseTo(0.8, 6) // 5 s * 0.04
+    expect(n.energy).toBeCloseTo(0.95, 6) // 5 s * 0.01
   })
   it('stays inside 0..1 and finite through 20,000 random steps and events', () => {
     let seed = 7
@@ -189,5 +189,34 @@ describe('robustness', () => {
         expect(v).toBeLessThanOrEqual(1)
       }
     }
+  })
+})
+
+// "Does it feel right" checks. The arithmetic tests above pass for ANY rates; these pin the rates
+// to what a 3-minute demo needs (found by simulating the dog: the first rates tired it out after a
+// single 25-second fetch).
+describe('feel (demo-scale)', () => {
+  it('five throws of about 12 s each (a minute of fetching) leave the dog still willing to play', () => {
+    const n = createNeeds()
+    applyNeedsEvent(n, 'launch')
+    run(n, 60, 'fetching', true)
+    expect(n.energy).toBeGreaterThan(0.3)
+    expect(wants(n).rest).toBe(false)
+  })
+  it('a long, long session of fetching (3 minutes) does tire it out', () => {
+    const n = createNeeds()
+    run(n, 180, 'fetching', true)
+    expect(wants(n).rest).toBe(true)
+  })
+  it('a tired dog is back to full energy after about 2 minutes lying down', () => {
+    const n = make(0, 0, 0.5)
+    run(n, 120, 'resting', true)
+    expect(n.energy).toBe(1)
+  })
+  it('three minutes with the user away makes it bored, but not yet pestering', () => {
+    const n = createNeeds()
+    run(n, 180, 'active', false)
+    expect(n.boredom).toBeGreaterThan(0.3)
+    expect(n.boredom).toBeLessThan(0.45)
   })
 })

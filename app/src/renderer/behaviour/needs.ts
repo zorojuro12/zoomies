@@ -15,9 +15,9 @@ export type NeedsEvent = 'pet' | 'launch' | 'fetchDone' | 'ballBrought'
 
 /** Rates are per second. */
 export const NEEDS = {
-  energy: { fetching: -0.04, active: 0.005, resting: 0.02, sleeping: 0.05 },
-  boredomUserIdle: 0.005,
-  boredomUserActive: 0.0015,
+  energy: { fetching: -0.01, active: 0.002, resting: 0.01, sleeping: 0.03 },
+  boredomUserIdle: 0.002,
+  boredomUserActive: 0.0006,
   boredomFetching: -0.02,
   boredomSleeping: -0.01,
   /** Seconds for attention to close 63% of the gap to its target. */

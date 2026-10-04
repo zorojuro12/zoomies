@@ -67,12 +67,12 @@ Rates per second (constants in `NEEDS`):
 
 | | fetching | active | resting | sleeping |
 |---|---|---|---|---|
-| energy | -0.04 | +0.005 | +0.02 | +0.05 |
-| boredom | -0.02 | +0.005 if the user is idle, +0.0015 if active | same | -0.01 |
+| energy | -0.01 | +0.002 | +0.01 | +0.03 |
+| boredom | -0.02 | +0.002 if the user is idle, +0.0006 if active | same | -0.01 |
 
 attention moves toward 1 when the user is active, toward 0 when not, as an exponential with a 20 s time constant. Events: `pet` boredom -0.3, attention +0.3; `launch` boredom -0.4, attention = 1; `fetchDone` energy -0.05, boredom -0.2; `ballBrought` boredom -0.3. `wants.play` = boredom > 0.6 and energy > 0.4; `wants.rest` = energy < 0.25. Everything is clamped to 0..1. `dtMs` is clamped to 5000 per step; a non-finite `dtMs` changes nothing.
 
-**Tests (hand-worked, written first):** fetching 10 s from energy 1 → 0.6; resting 10 s from 0.5 → 0.7; sleeping 20 s from 0.5 → 1 (clamped); boredom idle 100 s from 0 → 0.5; fetching 10 s from 0.5 → 0.3; attention active 20 s from 0 → 0.632 (1 - e^-1) and 100 s → above 0.99; idle decay mirrors it; each event's effect and the clamps; `wants` thresholds at the boundaries; `dtMs` 0, 1e9 and `NaN`; a random walk of 10,000 steps and events stays inside 0..1 and finite.
+**Tests (hand-worked, written first):** fetching 10 s from energy 1 → 0.9; resting 10 s from 0.5 → 0.6; sleeping 20 s from 0.5 → 1 (clamped); boredom idle 100 s from 0 → 0.2; fetching 10 s from 0.5 → 0.3; attention active 20 s from 0 → 0.632 (1 - e^-1) and 100 s → above 0.99; idle decay mirrors it; each event's effect and the clamps; `wants` thresholds at the boundaries; `dtMs` 0, 1e9 and `NaN`; a random walk of 10,000 steps and events stays inside 0..1 and finite.
 
 **Done when:** all green, mutation-checked (wrong sign on the fetching drain, no clamp, no dt clamp each break a test).
 

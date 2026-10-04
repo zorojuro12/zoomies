@@ -20,3 +20,6 @@
 ## Test Coverage
 - **Covered:** every rate, every event, clamps, thresholds at their boundaries, dt 0 / NaN / infinity / huge.
 - **Not covered:** nothing is wired into the host yet (Task 7); the rates are my numbers, tuned by feel later, not measured.
+
+## Addendum: the first rates were wrong (found by simulating, not by the tests)
+Daniel asked to see the needs change over time. A simulated timeline showed one 25-second fetch drained the dog to 0 and one minute lying down refilled it: the arithmetic tests passed because they pass for ANY rates. Fixed: energy fetching -0.01 (was -0.04), resting +0.01 (was +0.02), sleeping +0.03 (was +0.05), active +0.002; boredom idle +0.002 (was +0.005), active +0.0006. Added 4 demo-scale "feel" tests (a minute of fetching leaves it willing to play; 3 minutes tires it; 2 minutes lying down refills it; 3 minutes alone makes it bored but not pestering). Plan table updated. Lesson: for tuning numbers, simulate a story and look at it.
