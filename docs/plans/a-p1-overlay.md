@@ -301,19 +301,19 @@
 
 **Checkpoint 1: falls, bounces, settles**
 
-- [ ] **Step 1: Write failing tests** — Spec, `World` with `workArea {0,0,1000,800}`, no solids, steps of 16.667 ms: (a) `createBall(500,100)` → within 10 s simulated: `resting` true, `y` = 790 ± 1; (b) ball at (500, 700) with `vy` 1000 → right after the first contact `vy` < 0 and |`vy`| ≈ 0.55 × impact speed (± 10 %); (c) drop from y = 100: the apex after the first bounce is lower than 100 (more than 100 px of height lost); (d) gravity irrelevant: ball at (985, 400), `vx` 1000 → after one step `vx` < 0 and `x` ≤ 990.
-- [ ] **Step 2: Run** — `npx vitest run src/renderer/world/ball.test.ts` → FAIL (module not found).
-- [ ] **Step 3: Implement** `createBall`, `stepBall`.
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Commit** — `npx vitest run src/renderer/world/ball.test.ts && git add app/src/renderer/world/ball.ts app/src/renderer/world/ball.test.ts && git commit -m "feat: ball physics against the world SDF"`
+- [x] **Step 1: Write failing tests** — Spec, `World` with `workArea {0,0,1000,800}`, no solids, steps of 16.667 ms: (a) `createBall(500,100)` → within 10 s simulated: `resting` true, `y` = 790 ± 1; (b) ball at (500, 700) with `vy` 1000 → right after the first contact `vy` < 0 and |`vy`| ≈ 0.55 × impact speed (± 10 %); (c) drop from y = 100: the apex after the first bounce is lower than 100 (more than 100 px of height lost); (d) gravity irrelevant: ball at (985, 400), `vx` 1000 → after one step `vx` < 0 and `x` ≤ 990.
+- [x] **Step 2: Run** — `npx vitest run src/renderer/world/ball.test.ts` → FAIL (module not found).
+- [x] **Step 3: Implement** `createBall`, `stepBall`. Implemented the resting-wake rule and dt-clamp/substep directly from the Interfaces spec (not deferred) — as a result Checkpoint 2's robustness tests passed immediately with no further changes; merged into this single commit per the plan's own note rather than forcing an artificial separate failure.
+- [x] **Step 4: Run** → PASS, 7/7 (4 Checkpoint-1 + 3 Checkpoint-2 cases).
+- [x] **Step 5: Commit** — `npx vitest run src/renderer/world/ball.test.ts && git add app/src/renderer/world/ball.ts app/src/renderer/world/ball.test.ts && git commit -m "feat: ball physics against the world SDF"` → `b199839`
 
 **Checkpoint 2: robustness (Review Focus 3, 4)**
 
-- [ ] **Step 1: Write failing tests** — Spec: (a) ball resting on the floor at (300, 790); `setSolids([{250, 700, 200, 150}])` (a window dropped on it) → after one 16 ms step, `world.distance(x,y) − r` ≥ −0.5 and |v| ≤ `maxSpeed`; (b) ball falling at `vy` 3000 at y = 700, one `stepBall(…, 1000)` → `y` ≤ 790.5 (no tunnelling; only 50 ms simulated); (c) 1000 steps of 16.667 ms from rest at the floor → it never rises above y = 789 (no energy gain).
-- [ ] **Step 2: Run** → FAIL (expected for (a) if the resting branch skips collision; if all three pass straight away, merge these cases into Checkpoint 1's commit instead of committing separately — don't break the code to make them fail).
-- [ ] **Step 3: Implement** the resting-wake rule / dt clamp as needed.
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Commit** — `npx vitest run src/renderer/world/ball.test.ts && git add app/src/renderer/world/ball.ts app/src/renderer/world/ball.test.ts && git commit -m "fix: ball wakes when a window lands on it; dt clamp prevents tunnelling"`
+- [x] **Step 1: Write failing tests** — Spec: (a) ball resting on the floor at (300, 790); `setSolids([{250, 700, 200, 150}])` (a window dropped on it) → after one 16 ms step, `world.distance(x,y) − r` ≥ −0.5 and |v| ≤ `maxSpeed`; (b) ball falling at `vy` 3000 at y = 700, one `stepBall(…, 1000)` → `y` ≤ 790.5 (no tunnelling; only 50 ms simulated); (c) 1000 steps of 16.667 ms from rest at the floor → it never rises above y = 789 (no energy gain).
+- [x] **Step 2: Run** — all three passed immediately (resting-wake + dt-clamp/substep were already implemented per the Interfaces spec in Checkpoint 1, not deferred) — merged into Checkpoint 1's commit per this step's own instruction, no separate failure forced.
+- [x] **Step 3: Implement** — not needed; already covered by Checkpoint 1's implementation.
+- [x] **Step 4: Run** → PASS (part of the same 7/7 run as Checkpoint 1).
+- [x] **Step 5: Commit** — skipped; folded into `b199839` (Checkpoint 1's commit) per Step 2's merge instruction.
 
 **Checkpoint 3 (manual): ball in the overlay**
 
