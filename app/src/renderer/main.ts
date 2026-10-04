@@ -1,7 +1,7 @@
 // App host (CP0): renders our dog (the Aussie, via createDog) in a normal window. Click to make it run there;
 // it watches the cursor. Lane A turns this into the transparent overlay in P1.
 import type { Rect } from '@shared/geometry'
-import type { WindowRect } from '@shared/os'
+import type { ActivityEvent, WindowRect } from '@shared/os'
 import { createDog } from './dog/create-dog'
 import { ClickThroughGate } from './host/click-through'
 import { FrameStats } from './host/frame-stats'
@@ -57,7 +57,6 @@ async function start(): Promise<void> {
 
   const debugCtx = createDebugCanvas()
   const hud = new Hud(status)
-  hud.set('activity', 'activity: -')
 
   const onWindowsUpdate = (windows: readonly WindowRect[]): void => {
     hud.set('world', `${windows.length} windows`)
@@ -68,6 +67,29 @@ async function start(): Promise<void> {
   window.zoomies.onWorkArea((wa) => {
     workArea = wa
   })
+
+  let kps = 0
+  let backspaceRatio = 0
+  let mouseSpeed = 0
+  let idleSeconds = 0
+  const updateActivityHud = (): void => {
+    hud.set(
+      'activity',
+      `${kps.toFixed(1)} kps · bs ${backspaceRatio.toFixed(2)} · mouse ${mouseSpeed.toFixed(0)} px/s · idle ${idleSeconds.toFixed(0)}s`
+    )
+  }
+  window.zoomies.onActivity((e: ActivityEvent) => {
+    if (e.kind === 'typing') {
+      kps = e.keysPerSec
+      backspaceRatio = e.backspaceRatio
+    } else if (e.kind === 'mouse') {
+      mouseSpeed = e.speed
+    } else {
+      idleSeconds = e.seconds
+    }
+    updateActivityHud()
+  })
+  updateActivityHud()
 
   // createDog never leaves the host without a dog: bad spec file -> default dog; SDF dog fails to
   // start -> the placeholder (see dog/create-dog.ts).

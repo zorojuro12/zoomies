@@ -46,6 +46,9 @@ function createMainWindow(): void {
       (workArea) => sendTo(win, 'os:workArea', workArea)
     )
   }
+
+  const stopActivity = os.onActivity((activity) => sendTo(win, 'os:activity', activity))
+  app.on('will-quit', stopActivity)
 }
 
 // This method will be called when Electron has finished

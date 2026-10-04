@@ -1,9 +1,11 @@
 // The real Windows OsLayer (Task 4 of a-p1-overlay.md): polls the live window list, work area and
 // taskbar via Win32/DWM; owns the overlay's actual click-through toggle (replacing Task 3's
-// temporary index.ts callback). Activity (Task 5) wires into `onActivity` separately.
+// temporary index.ts callback). Activity (Task 5) wires `uiohook-napi` via `activity-hooks.ts`.
 import { screen, type BrowserWindow, type Rectangle } from 'electron'
 import type { Rect } from '@shared/geometry'
 import type { ActivityEvent, OsLayer, WindowRect } from '@shared/os'
+import { ActivityTracker } from './activity-tracker'
+import { startActivityHooks } from './activity-hooks'
 import { listRawWindows } from './win32-windows'
 import { sameWindows, taskbarRect, toWindowRects } from './window-list'
 
@@ -68,9 +70,8 @@ export class WindowsOsLayer implements OsLayer {
     return taskbarRect(toRect(display.bounds), toRect(display.workArea))
   }
 
-  onActivity(_cb: (e: ActivityEvent) => void): () => void {
-    // Wired in Task 5 (activity-hooks.ts) — no-op until then.
-    return () => {}
+  onActivity(cb: (e: ActivityEvent) => void): () => void {
+    return startActivityHooks(new ActivityTracker(), cb)
   }
 
   setClickThrough(enabled: boolean): void {

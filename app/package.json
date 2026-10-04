@@ -26,7 +26,8 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "koffi": "^3.3.2",
-    "three": "^0.186.1"
+    "three": "^0.186.1",
+    "uiohook-napi": "^1.5.5"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
