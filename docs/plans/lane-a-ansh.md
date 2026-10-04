@@ -91,6 +91,7 @@
 - [ ] Merge final fixes, tag `final`, run the demo path from a clean clone on Windows.
 - [ ] Secret scan before the repo goes public.
 - [ ] Support Abel on the video capture (screen recording on the Windows laptop).
+- [ ] **GPU assignment on the demo laptop:** after the final `npm run build:win`, assign "High performance" GPU to the built `zoomies.exe` (Settings → Display → Graphics, or the laptop will silently run on the weak integrated GPU — see risks table).
 
 ---
 
@@ -104,6 +105,7 @@
 | Integration bugs cluster on the Windows machine (Macs can't run the real overlay) | Daniel develops in a standalone dog preview page; merge into `dev` more often than checkpoints |
 | WSL → push → pull → rebuild loop is slow for Windows-only work | Consider running Claude Code natively on Windows for this repo (see PRD §6.4) |
 | Lane overload | Hand L2/G2/G3 to Daniel; cut per `00-shared.md` §6 |
+| **Demo laptop has a hybrid AMD+NVIDIA GPU; Chrome/Electron default to the weak AMD iGPU unless explicitly assigned.** Measured 2026-10-04: SDF dog cost went from avg 10ms/p95 122ms (AMD) to avg 0.8ms/p95 0.9ms (NVIDIA) on the same build. The fix (Windows Settings → Display → Graphics → assign the app's `.exe` to "High performance") is per-exe-path and was only applied to `chrome.exe` and this dev session's `node_modules/electron/dist/electron.exe` — it will **not** carry over to the real `npm run build:win` output (different exe path). | **Before the real demo (P5):** re-assign "High performance" GPU to the actual built `zoomies.exe` path on the demo laptop. Check `chrome://gpu`-equivalent (Electron's `chrome://gpu` works the same way) shows the NVIDIA GPU `*ACTIVE*` before presenting. Added as a P5 checklist item below. |
 
 ## Phase plans to write (writing-plans)
 `docs/plans/a-p1-overlay.md` → `a-p2-mvp-behaviour.md` → `a-p3-hardware-terrain-voice.md` → `a-p4-polish.md` — each written at the start of its phase.
