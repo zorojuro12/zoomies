@@ -375,12 +375,12 @@
 - Modify: `docs/plans/lane-a-ansh.md` (P1 checkboxes + notes), `CLAUDE.md` only if a verified command changed (it shouldn't)
 - Create: `journal/<YYYY-MM-DD_HHMM>_ansh_p1-overlay.md`
 
-- [ ] **Step 1: Full checks** — `cd app && npm test && npm run typecheck && npm run lint` → all green; confirm the new test files appear in the count (frame-stats, click-through, window-list, activity-tracker, world-sdf, ball, slingshot).
-- [ ] **Step 2: Verify by hand (CP1 demo path)** — Where: Windows demo laptop. Steps: `npm run dev` from a fresh `git pull`; run lane-a CP1: overlay + click-through, live window list feeding the world, the dog hosted, ball flung off real windows, FPS overlay. Run it twice.
-  Expected: all five hold both times without restarting.
-- [ ] **Step 3: Update `lane-a-ansh.md`** — tick the P1 bullets done (overlay, above taskbar, cost measured with numbers, click-through, OS layer, activity, render host, world SDF, ball + slingshot); note what moved to P2 (region rendering/scissor if Task 1's numbers didn't need it; small-window fallback if they did).
-- [ ] **Step 4: Journal** — use the `journal` skill: status, the overlay-cost numbers, anything that failed on Windows (native modules, DPI), what P2 starts with (fetch sequence on `aim`/`launch` events).
-- [ ] **Step 5: Commit** — `git add docs/plans/lane-a-ansh.md journal/<file> && git commit -m "docs: P1 overlay done - lane plan and journal"`. The branch is green and verified; `finishing-a-development-branch` takes it from here.
+- [x] **Step 1: Full checks** — `cd app && npm test && npm run typecheck && npm run lint` → all green, 524/524 tests; confirmed the new test files appear in the count (frame-stats, click-through, window-list, activity-tracker, world-sdf, ball, slingshot — all present with real per-test output, not a name-filter false green).
+- [x] **Step 2: Verify by hand (CP1 demo path)** — Where: Windows demo laptop. Steps: `npm run dev` from a fresh `git pull`; run lane-a CP1: overlay + click-through, live window list feeding the world, the dog hosted, ball flung off real windows, FPS overlay. Run it twice.
+  **Result (2026-10-04): PASSED both times, no restart needed between.** Along the way, caught and fixed a minor click-through hitbox asymmetry (see Task 7/8 history above and the dog-motion.ts commit) — not part of the original five checks, but found during this verification and worth having fixed before calling CP1 closed.
+- [x] **Step 3: Update `lane-a-ansh.md`** — ticked the P1 bullets done (overlay, above taskbar, cost measured with numbers, click-through, OS layer, activity, render host, world SDF, ball + slingshot). Region rendering/scissor noted as cut (Task 1's numbers didn't need it) and left in P4 only if ever actually needed; the small-window fallback was already decided against in Task 1.
+- [x] **Step 4: Journal** — `journal/2026-10-04_0613_ansh_p1-overlay-cp1-wrapup.md`.
+- [x] **Step 5: Commit** — this commit.
 
 ---
 
