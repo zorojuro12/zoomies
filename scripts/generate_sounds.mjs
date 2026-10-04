@@ -24,7 +24,7 @@ const SOUNDS = {
   pant: { p1: true, s: 3, text: `A dog panting happily after running, steady rhythmic breathing, close microphone, no background noise` },
   snore: { p1: true, s: 3, text: `A sleeping dog snoring softly, slow deep breaths with a gentle rumble, no background noise` },
   ball_squeak: { p1: true, s: 1, text: 'A short, cute, playful rubber squeaky-toy squeak, one quick bright "squeak", soft and friendly, not harsh or shrill, clean dry recording, no background noise' },
-  bark_alert: { s: 1, text: `A single sharp alert bark from a medium dog, attentive, ${CLEAN}` },
+  bark_alert: { s: 1, text: `A single bright, attentive alert bark from a friendly medium-sized dog, clear and playful, not aggressive or growly, ${CLEAN}` },
   yip_excited: { s: 1, text: `Two quick excited high-pitched yips from a dog, playful, ${CLEAN}` },
   whine: { s: 2, text: `A soft short dog whine, curious and a little pleading, ${CLEAN}` },
   yawn: { s: 2, text: `A dog yawning with a small squeaky whine at the end, sleepy, ${CLEAN}` },
