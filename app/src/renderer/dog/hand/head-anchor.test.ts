@@ -2,6 +2,7 @@
 // other dog (the placeholder) gets an estimate from its screen box.
 import { describe, expect, it } from 'vitest'
 import { bodyAnchor, handAnchor, headAnchor } from './head-anchor'
+import type { HeadAnchorDog } from './head-anchor'
 
 describe('headAnchor', () => {
   it("uses the dog's own head position and height when it knows them", () => {
@@ -86,7 +87,7 @@ describe('bodyAnchor (the stomach and back of a dog lying down)', () => {
   })
 
   it('the back end is on the opposite side to where the dog faces (mirror images)', () => {
-    const mk = (facing: 1 | -1) => ({
+    const mk = (facing: 1 | -1): HeadAnchorDog => ({
       getBounds: () => ({ x: 400, y: 200, w: 270, h: 150 }),
       getState: () => ({ x: 500, y: 330, facing })
     })
