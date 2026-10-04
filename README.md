@@ -1,86 +1,133 @@
 # Zoomies
 
-One photo of a dog becomes an always-on desktop pet: an animated version of *that* dog
-(photo-fitted SDF body + Gaussian-splat coat) that roams over your windows, keeps you
-company while you work, and plays joystick-launched fetch across your screen.
+**One photo of a dog becomes a real pet that lives on your desktop.**
 
-StormHacks 2026 · Huawei Challenge #2 "Fetching Reality" · Ansh, Daniel, Abel
+It roams over your real windows, keeps you company while you work, reacts to how you're
+typing and whether you've taken a break, and plays joystick-launched fetch across your
+entire screen — ricocheting the ball off your actual open windows and taskbar.
 
-- **New to the repo? Start with [`GETTING_STARTED.md`](GETTING_STARTED.md).**
-- What we're building: [`docs/specs/2026-10-03-zoomies-prd.md`](docs/specs/2026-10-03-zoomies-prd.md)
-- Stack and team workflow: [`docs/tech-stack.md`](docs/tech-stack.md)
-- Plans: [`docs/plans/`](docs/plans/) · Session journal: [`journal/`](journal/)
+Built in 24 hours at **StormHacks 2026** (SFU Burnaby) for **Huawei Custom Challenge #2 —
+"Fetching Reality"**, also eligible for the ElevenLabs, Gemini and Best Hardware tracks.
 
-## Run the app
+— Ansh, Daniel, Abel
 
-Requires Node.js LTS. **On Windows, use Windows-native Node in a Windows clone** (not WSL) —
-the overlay only works as a native Windows app.
+---
+
+## What makes it *this* dog
+
+Not a generic cartoon puppy. Give it one photo and it builds a dog whose proportions,
+coat colours and markings are actually measured from that photo:
+
+```
+your dog's photo ──► Gemini reads proportions, colours, markings ──► dog spec (JSON)
+                                                                          │
+                                                                          ▼
+                                            generic builder ──► SDF body + Gaussian-splat coat
+```
+
+No mesh, no rig, no Blender, anywhere in this pipeline. The body is **signed-distance-field
+ray-marching** (a handful of capsules and ellipsoids, fit to the photo's proportions); the fur
+is a **custom Gaussian-splat pass** on top, coloured from the photo. Both are named,
+GPU-native techniques doing exactly what they're best at — a few KB of shape data standing in
+for a model that would otherwise be megabytes of mesh and textures. Flip on the x-ray debug
+view and you can watch the primitives moving under the coat in real time.
+
+Run the real pipeline on any dog photo and it builds a dog file for it — we've verified it
+end-to-end against the live Gemini API, not just mocked. The hand-tuned spec for this specific
+Aussie is what you actually see in the demo, because it captures the photo's fine markings
+better than any automated pass did on the day; the generated pipeline is the proof that it
+works on *any* dog, not just this one.
+
+## What it actually does
+
+Everything below is built and has been verified running, on Windows, with the real hardware
+where hardware is involved — not a mockup.
+
+**Lives on your desktop, not in a window.** Transparent, always-on-top, click-through overlay
+— you can click and type in whatever's behind the dog without it ever stealing the click. The
+dog only intercepts input aimed directly at it. Your real windows and taskbar are solid objects
+in its physics world.
+
+**A whole personality, not a loop.** An internal needs model (energy / boredom / attention)
+decides what the dog does, not a fixed animation cycle:
+- Goes idle → sits and looks around → curls up asleep on the taskbar, and the frame rate
+  actually drops with it (60 fps active → ~5 fps asleep, shown live on the HUD).
+- Notices you come back — wakes, stretches, yawns, trots over to greet your cursor.
+- Settles down near whatever window you're actively typing in; dozes beside you during a long
+  focus session; gets confused (head-tilt) at a burst of backspaces.
+- After a long stretch with no break, brings you the ball and play-bows at you.
+- Typing detection is **timing only** — keystroke rate and bursts, never key contents.
+
+**Physical joystick fetch.** A real Arduino controller — joystick, button, touch sensor,
+buzzer — drives the dog over serial: pull the stick back and let go to throw (or press the
+button mid-pull to throw instantly), tap the button to call the dog, hold it for push-to-talk,
+touch the sensor to pet it. The board auto-detects its port, survives being unplugged and
+replugged mid-demo, and every single one of those actions has a mouse/keyboard fallback — a
+loose wire can never break the demo. The ball bounces off your real windows and the taskbar
+with proper restitution and friction until it settles, and the buzzer squeaks on pickup and
+chirps on every bounce.
+
+**Petting, for real.** Touch the sensor (or click the dog) and it lies down on its tummy while
+a small cartoon hand strokes it.
+
+**Talks back.** Hold the push-to-talk button and say something — ElevenLabs transcribes it,
+Gemini turns free text into one of seven real commands (sit, lie down, come, fetch, speak,
+good boy, a trick) with a fixed word-list fallback if the network's down, and the dog obeys.
+Type a command into the on-screen bar if you'd rather not talk.
+
+**It's quietly efficient.** Live frame-time overlay, adaptive frame rate, and a dog that
+measured **0.8 ms average / 0.9 ms p95 per frame** on the real demo hardware (RTX 2060) —
+the whole point of choosing SDFs and splats over a traditional rig in the first place.
+
+## The technique, lined up against what judges actually score
+
+| What's being judged | How we made it visible |
+|---|---|
+| Computational efficiency | Live FPS/frame-time HUD; adaptive 60→~5 fps asleep; a few KB of SDF shapes + a sparse splat coat, no triangle mesh |
+| Interactivity | Real joystick/button/touch hardware with full mouse fallback; dog reacts to your cursor, your typing, your breaks, your windows |
+| Aesthetics & animation | Shape and colour fitted to the actual photo; procedural gait + leg IK + springs + idle life (weight shifts, ear flicks, yawns) — hand-authored cartoon timing, not canned clips |
+| The technique ask | SDF ray-marched body **+** Gaussian-splat coat, both doing what they're named for; AI (Gemini) measures the photo, maths fits the shapes; an x-ray toggle shows the reconstruction live |
+
+## Quick start
 
 ```bash
 cd app
 npm install
-npm run dev      # launch with hot reload
-npm test         # unit tests (Vitest)
-npm run lint
-npm run typecheck
-npm run build    # typecheck + production build
+npm run dev       # launch with hot reload
 ```
 
-Copy `.env.example` to `.env` and add keys before using Gemini/ElevenLabs features.
+Requires Node 22+, and on Windows a **native Windows clone** (not WSL — the transparent
+overlay only works as a real Windows app). Copy `.env.example` to `.env` at the repo root and
+add your own Gemini/ElevenLabs keys to use those features.
+
+**Launching with the real controller plugged in?** Use
+`ZOOMIES_INVERT_Y=1 npm run dev` — see [`CLAUDE.md`](CLAUDE.md) for why.
+
+```bash
+npm test          # Vitest, 1000+ tests
+npm run typecheck
+npm run lint
+npm run build      # typecheck + production build
+```
+
+New to the repo or picking this up to contribute? Start at
+[`GETTING_STARTED.md`](GETTING_STARTED.md) — setup, branch rules, and the day-to-day workflow
+all three of us used to build this in 24 hours.
 
 ## Repo layout
 
-| Path | Contents | Lane |
-|---|---|---|
-| `app/` | Electron app (TypeScript, Three.js) | all |
-| `app/src/shared/` | Contracts between lanes | all |
-| `pipeline/` | Python build-time dog reconstruction | B |
-| `hardware/arduino/` | Controller sketch | C |
-| `scripts/` | Helper tools (landmark picker, sound generation) | C |
-| `assets/` | Photo, Gemini views, dog files, sounds | B / C |
-| `docs/`, `journal/` | PRD, stack, plans, session journal | all |
+| Path | Contents |
+|---|---|
+| `app/` | The Electron app (TypeScript, Three.js) — overlay shell, dog rendering, physics, AI behaviour |
+| `app/src/shared/` | Contracts shared between the shell, the dog and the hardware/voice layer |
+| `pipeline/` | Python: photo → Gemini → dog spec |
+| `hardware/arduino/` | The controller's Arduino sketch |
+| `assets/` | The source photo, generated views, dog spec files, sound library |
+| `docs/` | PRD, tech stack, phase plans | 
+| `journal/` | A dated log of the entire build, decision by decision |
 
-## Branch rules
+## More
 
-`main` = demo-ready builds (only Ansh merges into it, at checkpoints) · `dev` = where all work merges · your work = short-lived branches off `dev`.
-
-### Before making a branch
-1. Commit or stash anything unfinished on your current branch.
-2. Start from the latest `dev`:
-   ```bash
-   git checkout dev
-   git pull
-   ```
-3. Create the branch with your lane prefix — `a/` Ansh, `b/` Daniel, `c/` Abel — and a short task name:
-   ```bash
-   git checkout -b a/overlay-window
-   ```
-4. One task or phase per branch. Plan to merge it within a few hours — long-lived branches are where conflicts come from.
-
-### While working
-- Commit small and often: `git add <exact files>` (not `-A`), message `type: what changed` (`feat`, `fix`, `docs`, `chore`, `test`).
-- **Only edit your own lane's folders and plans.** Plans: you edit only `docs/plans/lane-<you>-*.md` and your own phase plans (`a-p*`, `b-p*`, `c-p*`). Then your branch's version of your plan always wins without conflicts.
-- When someone says they merged into `dev`, pull it in: `git fetch && git merge origin/dev`.
-- Shared files — `app/src/shared/` (contracts), `docs/plans/00-shared.md`, `CLAUDE.md`, `package.json` — change only in a **small separate PR**, merge it quickly, and tell the group chat.
-
-### Before merging a branch
-1. **Bring in the latest `dev`** — merge, don't rebase:
-   ```bash
-   git fetch
-   git merge origin/dev
-   ```
-2. **Resolve conflicts in your branch**, not on `dev`:
-   - **Your own plan/lane files:** keep your version — `git checkout --ours <file>`, then `git add <file>` — but first look at what `dev` changed (`git diff MERGE_HEAD -- <file>`) in case it matters.
-   - **Shared files and other people's files:** combine both sides by hand; ask the owner if unsure. Never blindly keep yours.
-   - Finish with `git commit`.
-3. **Re-run the checks** after the merge: `cd app && npm test && npm run typecheck` (and `cd pipeline && pytest` if you touched it).
-4. **Windows-only changes** (overlay, click-through, window list, input hooks, serial) must have run on Windows.
-5. **No secrets:** `.env` isn't staged, no keys in code.
-6. Push: `git push -u origin <your-branch>`.
-7. Open a PR **into `dev`** on GitHub and merge with **"Create a merge commit"** (not squash, not rebase).
-8. If GitHub says *"This branch is out-of-date"*, click **Update branch** (or repeat steps 1–3).
-
-### After merging
-- Post in the group chat: what merged, and whether it touched shared files.
-- Delete the branch (GitHub can do it automatically), then `git checkout dev && git pull` before the next task.
-- End of a phase or before a break: write a journal entry (`journal/`, your name in the filename).
+- **What we're building and why:** [`docs/specs/2026-10-03-zoomies-prd.md`](docs/specs/2026-10-03-zoomies-prd.md)
+- **Stack and architecture:** [`docs/tech-stack.md`](docs/tech-stack.md)
+- **Everything, in order, as it happened:** [`journal/`](journal/)
