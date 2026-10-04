@@ -293,6 +293,9 @@ describe('a second fetch', () => {
 })
 
 describe('whatever happens, it ends free (fuzz)', () => {
+  // 30 games of heavy simulation (~2.7s alone) occasionally trips the default 5000ms testTimeout
+  // under full-suite parallel load; not flaky otherwise (fixed seed). Same fix as the equivalent
+  // fuzz test in behaviour.test.ts (2026-10-04, Ansh — flagged to Daniel).
   it('survives 30 random games of throws, cancels, grabs, teleports and moving windows', () => {
     let seed = 2026
     const rand = (): number => {
@@ -352,7 +355,7 @@ describe('whatever happens, it ends free (fuzz)', () => {
       expect(h.dog.attached).toBe(false)
       expect(h.ball.held).toBe(false)
     }
-  })
+  }, 20000)
 })
 
 describe('tuning', () => {

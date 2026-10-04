@@ -98,6 +98,18 @@ async function start(): Promise<void> {
     }
   )
   const input = (e: InputEvent): void => {
+    // The controller's aim/launch carry only an angle and power (no drag point on screen), unlike
+    // the mouse slingshot (pointerdown/move/up below) which grabs the ball directly - so this path
+    // has to do what that one does by hand: give the ball real velocity on launch, and draw the aim
+    // line from wherever it currently rests. Without this the ball never physically moves.
+    if (e.kind === 'launch') {
+      launchVelocity(e.angle, e.power, ball)
+      ball.resting = false
+      ball.held = false
+      worldView.setAim(ball, null)
+    } else if (e.kind === 'aim') {
+      worldView.setAim(ball, { angle: e.angle, power: e.power })
+    }
     behaviour?.handleInput(e)
     if (e.kind === 'pushToTalk') {
       hud.set('voice', e.state === 'start' ? 'listening…' : 'sending…')
