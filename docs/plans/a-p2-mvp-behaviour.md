@@ -88,6 +88,8 @@ attention moves toward 1 when the user is active, toward 0 when not, as an expon
 
 ### Task 4: Reactions + arbiter
 
+> **Decided with Daniel (2026-10-04):** no ear scratch (the dog's own yawn/sniff tricks instead; the sit pose cannot play tricks, so idle is just a sit); "lie down near the active window" = the floor below the topmost window's centre; late night = a sleepier mood only; "bored and has energy" brings the ball (the break nudge uses the same bring-the-ball move, `Fetch.bringBall`); and the combining class `Behaviour` was brought forward from Task 7 so the whole personality can be seen on the preview page: `/preview.html?spec=aussie&behaviour=1` (your real mouse and keyboard drive it, buttons fake the rest; `&realtime=1` for the real minutes).
+
 `reactions.ts` is the PRD §4.3/4.4 table as data + a chooser: steady typing → lie down near the active window; long typing → doze (focus buddy); backspace spam → head tilt; idle 1 min → sit, look around, ear scratch (the dog's idle tricks); idle 5 min → sleep on the taskbar; return → wake, stretch, yawn, trot to greet the cursor; cursor hover → look up, wag; cursor shaken fast → play-bow; break due → bring the ball, drop it by the cursor, play-bow; late night → more yawns. Mood hints through `DogExtras` (`happy` after fetch, `sleepy` at night/idle, `alert` on a sudden mouse). `arbiter.ts`: priority fetch > user command > reaction > idle; a higher priority preempts, a lower one waits. Tests: each row of the table; the arbiter's preemption and release; look-at ownership (ball beats cursor).
 
 ### Task 5: Adaptive FPS

@@ -1,0 +1,373 @@
+// Behaviour (P2 Task 4 of docs/plans/a-p2-mvp-behaviour.md): the dog's personality. It puts the
+// needs model, the activity classifier, fetch, the reactions table and the arbiter together:
+//   host -> handleActivity / handleInput / setWindows / setCursor, then update(dtMs) once a frame
+// (after stepBall, before dog.update). It knows nothing about Three.js or Electron: only a
+// DogController, the ball and the world.
+import type { DogController } from '@shared/dog-controller'
+import type { InputEvent } from '@shared/input'
+import type { ActivityEvent, WindowRect } from '@shared/os'
+import type { Ball } from '../world/ball'
+import type { World } from '../world/world-sdf'
+import { ActivityClassifier } from './activity'
+import type { ActivityNote } from './activity'
+import { Arbiter, chooseLook } from './arbiter'
+import { asExtras } from './dog-extras'
+import type { DogExtras } from './dog-extras'
+import { Fetch } from './fetch'
+import type { FetchNote } from './fetch'
+import { applyNeedsEvent, createNeeds, stepNeeds, wants } from './needs'
+import type { Doing, Needs } from './needs'
+import { createReactions } from './reactions'
+import type { Ctx, Env, Reaction } from './reactions'
+import { BEHAVIOUR_TIMING } from './timing'
+import type { Timing } from './timing'
+
+export interface BehaviourOptions {
+  dog: DogController
+  ball: Ball
+  world: World
+  groundY: () => number
+  timing?: Timing
+  /** Is the cursor over the dog? (the host's `dog.hitTest`) */
+  hitTest?: (x: number, y: number) => boolean
+  /** The local hour of day, 0..23 (injectable so tests do not depend on the clock). */
+  hour?: () => number
+}
+
+const SHAKE_SPEED = 2500
+const PET_HOLD_MS = 2500
+
+export class Behaviour {
+  readonly needs: Needs = createNeeds()
+  readonly activity: ActivityClassifier
+  readonly fetch: Fetch
+  readonly arbiter = new Arbiter()
+
+  private readonly dog: DogController
+  private readonly extras: DogExtras
+  private readonly world: World
+  private readonly timing: Timing
+  private readonly hitTest: (x: number, y: number) => boolean
+  private readonly hour: () => number
+  private readonly reactions = createReactions()
+  private readonly env: Env
+  private readonly cooldownUntil = new Map<string, number>()
+
+  private clockMs = 0
+  private windows: readonly WindowRect[] = []
+  private current: Reaction | null = null
+  private returnedPending = false
+  private returnedAgeMs = 0
+  private keysPerSec = 0
+  private commandHoldMs = 0
+  private petting = false
+  private bringReason: 'none' | 'break' | 'bored' = 'none'
+  private bringCooldownUntil = 0
+  private lookingAtCursor = false
+
+  private readonly cursor = {
+    x: 0,
+    y: 0,
+    speed: 0,
+    known: false,
+    ageMs: Number.POSITIVE_INFINITY,
+    overMs: 0,
+    overGraceMs: 0,
+    fastMs: 0,
+    slowMs: 0
+  }
+  private readonly lookPoint = { x: 0, y: 0 }
+  private readonly ctx: Ctx = {
+    clockMs: 0,
+    user: 'active',
+    backspaceSpam: false,
+    lateNight: false,
+    keysPerSec: 0,
+    needs: this.needs,
+    dogX: 0,
+    windowX: Number.NaN,
+    cursorX: 0,
+    cursorOverMs: 0,
+    cursorFastMs: 0,
+    returnedPending: false,
+    screenW: 1920
+  }
+
+  constructor(opts: BehaviourOptions) {
+    this.dog = opts.dog
+    this.extras = asExtras(opts.dog)
+    this.world = opts.world
+    this.timing = opts.timing ?? BEHAVIOUR_TIMING
+    this.hitTest = opts.hitTest ?? (() => false)
+    this.hour = opts.hour ?? ((): number => new Date().getHours())
+    this.activity = new ActivityClassifier(this.timing)
+    this.fetch = new Fetch({
+      dog: opts.dog,
+      ball: opts.ball,
+      world: opts.world,
+      groundY: opts.groundY
+    })
+    this.env = { dog: opts.dog, extras: this.extras, arrived: false }
+
+    opts.dog.onEvent((e) => {
+      if (e.kind === 'arrived') this.env.arrived = true
+    })
+    this.activity.onNote((n) => this.onActivityNote(n))
+    this.fetch.onNote((n) => this.onFetchNote(n))
+    // when something more important takes the dog, the previous owner tidies up
+    this.arbiter.onPreempt((id) => {
+      if (this.current && this.current.id === id) {
+        this.current.stop(this.env)
+        this.current = null
+      }
+      if (id === 'pet') this.endPet()
+    })
+  }
+
+  // ---- inputs from the host ----------------------------------------------------------------
+
+  handleActivity(e: ActivityEvent): void {
+    this.activity.onEvent(e)
+    if (e.kind === 'mouse') this.setCursor(e.x, e.y, e.speed)
+    else if (e.kind === 'typing' && Number.isFinite(e.keysPerSec)) this.keysPerSec = e.keysPerSec
+  }
+
+  handleInput(e: InputEvent): void {
+    if (e.kind === 'launch') {
+      this.fetch.launch()
+    } else if (e.kind === 'pet') {
+      applyNeedsEvent(this.needs, 'pet')
+      if (this.arbiter.request('command', 'pet', 1, PET_HOLD_MS)) {
+        this.commandHoldMs = PET_HOLD_MS
+        this.petting = true
+        void this.dog.setPose('headTilt')
+        this.extras.setMood('happy', 1)
+        this.dog.setLayer({ tailWag: 1 })
+      }
+    }
+  }
+
+  setWindows(windows: readonly WindowRect[]): void {
+    this.windows = windows
+  }
+
+  /** The cursor is at (x, y) moving at `speed` px/s (mouse activity events call this too). */
+  setCursor(x: number, y: number, speed: number): void {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return
+    const c = this.cursor
+    c.x = x
+    c.y = y
+    c.speed = Number.isFinite(speed) ? Math.max(0, speed) : 0
+    c.known = true
+    if (c.speed > 0) c.ageMs = 0
+  }
+
+  /** The user did something to the dog directly (clicked it...): reactions wait for a moment. */
+  userCommand(holdMs = 5000): void {
+    if (this.arbiter.request('command', 'user', 0, holdMs)) this.commandHoldMs = holdMs
+  }
+
+  // ---- what it is up to (for the demo readout and tests) ----------------------------------
+
+  /** The id of the running reaction, or '' (fetch and commands are not reactions). */
+  get reaction(): string {
+    return this.current?.id ?? ''
+  }
+
+  describe(): string {
+    const n = this.needs
+    return (
+      `${this.arbiter.owner}${this.arbiter.id ? `:${this.arbiter.id}` : ''} · user ${this.activity.state.user}` +
+      ` · fetch ${this.fetch.state} · energy ${n.energy.toFixed(2)} boredom ${n.boredom.toFixed(2)} attention ${n.attention.toFixed(2)}`
+    )
+  }
+
+  // ---- once a frame -------------------------------------------------------------------------
+
+  update(dtMs: number): void {
+    const dt = Number.isFinite(dtMs) && dtMs > 0 ? Math.min(dtMs, 100) : 0
+    this.clockMs += dt
+    this.tickCursor(dt)
+    this.activity.update(dt, this.hour())
+    if (this.returnedPending) {
+      this.returnedAgeMs += dt
+      if (this.returnedAgeMs > 4000) this.returnedPending = false
+    }
+    this.fetch.update(dt)
+    if (this.arbiter.owner === 'fetch' && !this.fetch.active) this.arbiter.release('fetch')
+    this.arbiter.update(dt)
+
+    this.runOwner(dt)
+    this.chooseReaction()
+    this.maybeBringBall()
+    this.look()
+
+    const user = this.activity.state.user
+    stepNeeds(
+      this.needs,
+      dt,
+      this.doing(),
+      user === 'active' || user === 'typing' || user === 'focus'
+    )
+  }
+
+  // ---- internals ---------------------------------------------------------------------------
+
+  private doing(): Doing {
+    if (this.fetch.active) return 'fetching'
+    return this.current?.doing ?? 'active'
+  }
+
+  private tickCursor(dt: number): void {
+    const c = this.cursor
+    c.ageMs += dt
+    const speed = c.ageMs > 300 ? 0 : c.speed
+    if (c.known && this.hitTest(c.x, c.y)) {
+      c.overMs += dt
+      c.overGraceMs = 0
+    } else {
+      c.overGraceMs += dt
+      if (c.overGraceMs > 800) c.overMs = 0
+    }
+    if (speed > SHAKE_SPEED) {
+      c.fastMs += dt
+      c.slowMs = 0
+    } else {
+      c.slowMs += dt
+      if (c.slowMs > 300) c.fastMs = 0
+    }
+  }
+
+  private context(): Ctx {
+    const c = this.ctx
+    const s = this.activity.state
+    c.clockMs = this.clockMs
+    c.user = s.user
+    c.backspaceSpam = s.backspaceSpam
+    c.lateNight = s.lateNight
+    c.keysPerSec = this.keysPerSec
+    c.dogX = this.dog.getState().x
+    c.screenW = this.world.getBounds().w
+    c.windowX = this.activeWindowX(c.screenW)
+    c.cursorX = this.cursor.x
+    c.cursorOverMs = this.cursor.overMs
+    c.cursorFastMs = this.cursor.fastMs
+    c.returnedPending = this.returnedPending
+    return c
+  }
+
+  private activeWindowX(screenW: number): number {
+    for (const w of this.windows) {
+      if (!w.minimized) return Math.min(Math.max(w.x + w.w / 2, 60), screenW - 60)
+    }
+    return Number.NaN
+  }
+
+  private runOwner(dt: number): void {
+    const owner = this.arbiter.owner
+    if (owner === 'reaction' || owner === 'greet') {
+      const r = this.current
+      if (!r) {
+        this.arbiter.release(this.arbiter.id)
+        return
+      }
+      const alive = r.update(dt, this.context(), this.env)
+      if (!alive && this.arbiter.heldMs >= r.minHoldMs) {
+        r.stop(this.env)
+        this.current = null
+        this.arbiter.release(r.id)
+      }
+    } else if (owner === 'command') {
+      if (this.arbiter.heldMs >= this.commandHoldMs) {
+        if (this.petting) this.endPet()
+        this.arbiter.release(this.arbiter.id)
+      }
+    }
+  }
+
+  private endPet(): void {
+    this.petting = false
+    this.dog.setLayer({ tailWag: 0.5 })
+    this.extras.setMood('neutral', 0)
+    void this.dog.setPose('stand')
+  }
+
+  private chooseReaction(): void {
+    const o = this.arbiter.owner
+    if (o === 'command' || o === 'fetch') return
+    const ctx = this.context()
+    for (const r of this.reactions) {
+      if (this.arbiter.owner !== 'none' && this.arbiter.id === r.id) continue
+      if (!r.eligible(ctx)) continue
+      if (this.clockMs < (this.cooldownUntil.get(r.id) ?? 0)) continue
+      if (!this.arbiter.request(r.rank, r.id, r.priority, r.minHoldMs)) continue
+      this.current = r
+      this.cooldownUntil.set(r.id, this.clockMs + r.cooldownMs)
+      if (r.id === 'greet') this.returnedPending = false
+      r.start(ctx, this.env)
+      return
+    }
+  }
+
+  /** Break time, or bored and not tired: the dog fetches the ball by itself and brings it to the cursor. */
+  private maybeBringBall(): void {
+    if (this.fetch.active || this.clockMs < this.bringCooldownUntil) return
+    const o = this.arbiter.owner
+    if (o !== 'none' && o !== 'reaction') return
+    const u = this.activity.state.user
+    if (u !== 'active' && u !== 'typing' && u !== 'focus') return
+    const breakDue = this.activity.state.breakDue && this.needs.energy > 0.25
+    const bored = wants(this.needs).play
+    if (!breakDue && !bored) return
+    if (!this.fetch.canBring()) return
+    const wa = this.world.getBounds()
+    const x = this.cursor.known ? this.cursor.x : this.dog.getState().x
+    if (this.fetch.bringBall(Math.min(Math.max(x, wa.x + 60), wa.x + wa.w - 60))) {
+      this.bringReason = breakDue ? 'break' : 'bored'
+      // a bored dog does not nag again for a while: four "real breaks" long (12 min; 40 s in the demo)
+      this.bringCooldownUntil = this.clockMs + this.timing.realBreakSec * 4000
+    }
+  }
+
+  private look(): void {
+    const choice = chooseLook({ ballWatched: this.fetch.active, cursorAgeMs: this.cursor.ageMs })
+    if (choice === 'ball') {
+      this.lookingAtCursor = false // fetch does its own looking
+    } else if (choice === 'cursor') {
+      this.lookPoint.x = this.cursor.x
+      this.lookPoint.y = this.cursor.y
+      this.dog.lookAt(this.lookPoint)
+      this.lookingAtCursor = true
+    } else if (this.lookingAtCursor) {
+      this.dog.lookAt(null)
+      this.lookingAtCursor = false
+    }
+  }
+
+  private onActivityNote(n: ActivityNote): void {
+    if (n === 'returned') {
+      this.returnedPending = true
+      this.returnedAgeMs = 0
+    }
+  }
+
+  private onFetchNote(n: FetchNote): void {
+    if (n === 'launched' || n === 'bringing') {
+      if (n === 'launched') {
+        applyNeedsEvent(this.needs, 'launch')
+        this.bringReason = 'none'
+      }
+      this.arbiter.request('fetch', 'fetch', 0, 0)
+    } else if (n === 'dropped') {
+      if (this.bringReason !== 'none') applyNeedsEvent(this.needs, 'ballBrought')
+    } else if (n === 'done') {
+      applyNeedsEvent(this.needs, 'fetchDone')
+      if (this.bringReason === 'break') this.activity.breakHandled()
+      this.bringReason = 'none'
+      this.arbiter.release('fetch')
+    } else if (n === 'gaveUp' || n === 'cancelled') {
+      this.bringReason = 'none'
+      this.arbiter.release('fetch')
+    }
+  }
+}

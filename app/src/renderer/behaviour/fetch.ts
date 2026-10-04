@@ -18,7 +18,7 @@ export type FetchState = 'idle' | 'chasing' | 'grabbing' | 'returning' | 'celebr
 
 /** One-off things that happen, for sounds and moods (Tasks 4 and 6). */
 export type FetchNote =
-  'launched' | 'pickedUp' | 'returning' | 'dropped' | 'done' | 'gaveUp' | 'cancelled'
+  'launched' | 'bringing' | 'pickedUp' | 'returning' | 'dropped' | 'done' | 'gaveUp' | 'cancelled'
 
 export const FETCH = {
   /** How often the dog re-guesses where a moving ball will land. */
@@ -116,6 +116,27 @@ export class Fetch {
     this.targetX = Number.NaN
     this.arrived = false
     this.emit('launched')
+  }
+
+  /** Could the dog go and fetch the ball by itself right now (it is resting on the floor, free)? */
+  canBring(): boolean {
+    const b = this.ball
+    const onFloor = b.y + b.r >= this.groundY() - FETCH.reachHeightPx
+    return this.state === 'idle' && !b.held && b.resting && onFloor
+  }
+
+  /** The dog fetches the resting ball by itself and brings it to `dropX` (break nudge, "play with me"). */
+  bringBall(dropX: number): boolean {
+    if (!this.canBring()) return false
+    this.originDogX = dropX
+    this.originBallX = dropX
+    this.state = 'chasing'
+    this.timer = 0
+    this.retargetT = FETCH.retargetMs
+    this.targetX = Number.NaN
+    this.arrived = false
+    this.emit('bringing')
+    return true
   }
 
   /** The user took over (clicked the dog, grabbed the ball...): stop cleanly, whatever was going on. */

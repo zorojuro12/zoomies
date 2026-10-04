@@ -17,6 +17,10 @@ export class FakeDog implements DogController {
   /** Where it was told to look, each time (copied, so later changes do not rewrite history). */
   readonly looks: (Point | null)[] = []
   readonly moves: { x: number; gait: Gait }[] = []
+  /** Dog-only extras (moods and idle tricks), recorded like the rest. */
+  readonly moods: string[] = []
+  readonly idles: string[] = []
+  readonly layers: { tailWag?: number; earPerk?: number; breathing?: number }[] = []
   private target: { x: number; y: number; speed: number } | null = null
   private resolve: (() => void) | null = null
   private readonly listeners = new Set<(e: DogEvent) => void>()
@@ -50,8 +54,17 @@ export class FakeDog implements DogController {
     this.looks.push(target ? { x: target.x, y: target.y } : null)
   }
 
-  setLayer(): void {
-    // the fake dog has no layers
+  setLayer(params: { tailWag?: number; earPerk?: number; breathing?: number }): void {
+    this.layers.push({ ...params })
+  }
+
+  setMood(name: string, intensity = 1): void {
+    this.moods.push(`${name} ${intensity}`)
+  }
+
+  playIdle(name: string): Promise<void> {
+    this.idles.push(name)
+    return Promise.resolve()
   }
 
   attachBall(attached: boolean): void {

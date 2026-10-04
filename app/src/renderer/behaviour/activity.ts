@@ -59,6 +59,12 @@ export class ActivityClassifier {
     this.state.breakDue = false
   }
 
+  /** Pretend the user has just worked the whole break interval (for demos and tests). */
+  forceBreakDue(): void {
+    this.workedSec = this.timing.breakAfterSec
+    this.recompute()
+  }
+
   /** Feed one event from the activity tracker. */
   onEvent(e: ActivityEvent): void {
     if (e.kind === 'typing') {

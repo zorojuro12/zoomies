@@ -361,3 +361,53 @@ describe('tuning', () => {
     expect(FETCH.reachHeightPx).toBe(40)
   })
 })
+
+describe('bringBall (the dog fetches the ball by itself and brings it to a spot)', () => {
+  it('goes to the resting ball, picks it up and drops it at the asked-for spot', () => {
+    const h = setup({ dogX: 300, ballX: 900 })
+    expect(h.fetch.bringBall(1500)).toBe(true)
+    runFor(h, 40)
+    expect(h.notes).toEqual(['bringing', 'pickedUp', 'returning', 'dropped', 'done'])
+    expect(Math.abs(h.dog.x - 1500)).toBeLessThan(5)
+    expect(h.dog.attached).toBe(false)
+    expect(h.ball.held).toBe(false)
+  })
+
+  it('does that even when set to bring balls back to where the BALL was thrown from', () => {
+    const h = setup({ dogX: 300, ballX: 900, dropSpot: 'ballOrigin' })
+    h.fetch.bringBall(1500)
+    runFor(h, 40)
+    expect(Math.abs(h.dog.x - 1500)).toBeLessThan(5)
+  })
+
+  it('says no (and does nothing) when it cannot: a fetch is already on, the ball is held, moving, or up on a window', () => {
+    const busy = setup()
+    throwBall(busy, 500, -500)
+    expect(busy.fetch.bringBall(1500)).toBe(false)
+
+    const held = setup()
+    held.ball.held = true
+    expect(held.fetch.bringBall(1500)).toBe(false)
+
+    const moving = setup()
+    moving.ball.resting = false
+    expect(moving.fetch.bringBall(1500)).toBe(false)
+
+    const shelf = setup({ solids: [{ x: 800, y: 600, w: 300, h: 432 }] })
+    shelf.ball.y = 590
+    shelf.ball.x = 900
+    expect(shelf.fetch.canBring()).toBe(false)
+    expect(shelf.fetch.bringBall(1500)).toBe(false)
+    expect(shelf.notes).toEqual([])
+    expect(shelf.fetch.state).toBe('idle')
+  })
+
+  it('can be called off like any fetch', () => {
+    const h = setup()
+    h.fetch.bringBall(1500)
+    runFor(h, 0.5)
+    h.fetch.cancel()
+    expect(h.fetch.state).toBe('idle')
+    expect(h.notes).toEqual(['bringing', 'cancelled'])
+  })
+})

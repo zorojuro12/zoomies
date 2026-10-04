@@ -239,6 +239,17 @@ describe('break due (50 minutes of working)', () => {
   })
 })
 
+describe('forceBreakDue (demo button)', () => {
+  it('makes the break due at once, and breakHandled still clears it', () => {
+    const { c, notes } = make()
+    c.forceBreakDue()
+    expect(c.state.breakDue).toBe(true)
+    expect(notes).toContain('breakDue')
+    c.breakHandled()
+    expect(c.state.breakDue).toBe(false)
+  })
+})
+
 describe('late night', () => {
   it('is on from 23:00 to 04:59 and off otherwise', () => {
     const { c } = make()
