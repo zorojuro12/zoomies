@@ -12,7 +12,7 @@ Priority: **P1** = generate first (credits may run short); **P2** = the rest.
 | `pant` | P1 | 3 | yes | A dog panting happily after running, steady rhythmic breathing, close microphone, no background noise |
 | `snore` | P1 | 3 | yes | A sleeping dog snoring softly, slow deep breaths with a gentle rumble, no background noise |
 | `ball_squeak` | P1 | 1 | no | A short, cute, playful rubber squeaky-toy squeak, one quick bright "squeak", soft and friendly, not harsh or shrill, clean dry recording, no background noise |
-| `bark_alert` | P2 | 1 | no | A single sharp alert bark from a medium dog, attentive, clean dry recording |
+| `bark_alert` | P2 | 1 | no | A single bright, attentive alert bark from a friendly medium-sized dog, clear and playful, not aggressive or growly, clean dry recording, no background noise |
 | `yip_excited` | P2 | 1 | no | Two quick excited high-pitched yips from a dog, playful, clean dry recording |
 | `whine` | P2 | 2 | no | A soft short dog whine, curious and a little pleading, clean dry recording |
 | `yawn` | P2 | 2 | no | A dog yawning with a small squeaky whine at the end, sleepy, clean dry recording |

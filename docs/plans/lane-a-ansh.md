@@ -60,17 +60,18 @@
 - **Done when (CP1):** on Windows — overlay with working click-through, live window list feeding the world SDF, placeholder dog hosted, ball bounces off real windows, FPS overlay showing frame time. **Confirmed twice in a row from a fresh `git pull`, no restart needed between, 2026-10-04.**
 
 ## P2 — MVP: everything Must works end to end
-- [ ] **Fetch sequence** (behaviour state machine): ball launched → dog looks at ball → `moveTo` landing spot (run) → pickup (`attachBall`) → return → drop near cursor → wag. Works with `PlaceholderDog`, then Daniel's dog.
-- [ ] **Needs model:** energy / boredom / attention, decaying and reacting to events; behaviour picked from needs (PRD §4.5).
-- [ ] **Desktop reactions (Musts):** cursor hover = look + wag; idle 1 min = sit/look around; **idle 5 min = sleep on the taskbar + adaptive FPS (~5)**; return = wake/stretch/greet; steady typing = lie down near the active window; ~50 min no break = bring ball + play-bow.
-- [ ] **Adaptive FPS:** 60 when active, ~5 asleep, overlay shows it.
-- [ ] **Sound cues:** call Abel's `playSound` from behaviour events (bark on launch, squeak on pickup, panting after fetch, snoring asleep), passing the dog's screen x for panning. Abel owns playback, variants and panning.
-- [ ] **Integrate Daniel's `DogView` / `DogController`** as soon as they land; keep the placeholder as a fallback flag.
-- **Tests:** needs-model transitions; idle/typing classification thresholds; fetch state machine transitions (with a fake controller).
-- **Done when (CP2):** demo path (launch → cursor → mouse fetch → idle → sleep → wake) on Windows with the real dog, ≥ 60 FPS active, sleep FPS drop visible. Promote + tag `mvp`.
+- [x] **Fetch sequence** (behaviour state machine): ball launched → dog looks at ball → `moveTo` landing spot (run) → pickup (`attachBall`) → return → drop near cursor → wag. `behaviour/fetch.ts` + `behaviour/landing.ts` (Daniel), wired into `main.ts`.
+- [x] **Needs model:** energy / boredom / attention, decaying and reacting to events; behaviour picked from needs (PRD §4.5). `behaviour/needs.ts`.
+- [x] **Desktop reactions (Musts):** cursor hover = look + wag; idle 1 min = sit/look around; **idle 5 min = sleep on the taskbar + adaptive FPS (~5)**; return = wake/stretch/greet; steady typing = lie down near the active window; ~50 min no break = bring ball + play-bow. `behaviour/reactions.ts` + `behaviour/arbiter.ts`.
+- [x] **Adaptive FPS:** 60 when active, ~5 asleep, overlay shows it. `behaviour/fps.ts` (`FrameGovernor`), HUD shows the tier.
+- [x] **Sound cues:** call Abel's `playSound` from behaviour events (bark on launch, squeak on pickup, panting after fetch, snoring asleep), passing the dog's screen x for panning. `behaviour/cues.ts`, real audio module from Abel (`app/src/renderer/audio/`) — confirmed audible (bark + squeak on launch).
+- [x] **Integrate Daniel's `DogView` / `DogController`** — `SdfDog` is the real dog in the host; placeholder stays as the fallback flag.
+- **Tests:** needs-model transitions; idle/typing classification thresholds; fetch state machine transitions (with a fake controller). 753/753 passing project-wide at CP2 close.
+- **Done when (CP2):** demo path (launch → cursor → mouse fetch → idle → sleep → wake) on Windows with the real dog, ≥ 60 FPS active, sleep FPS drop visible. **Verified on Windows, 2026-10-04, twice in the same running session without restarting** — full cycle (launch/fetch/idle/sleep/wake) held both times. Promote + tag `mvp`.
 
 ## P3 — Shoulds
 - [ ] **Serial (with Abel):** `serialport`, auto-detect the port by `HELLO:zoomies:1`, parse §3.7, reconnect on unplug; map to `InputEvent`s — joystick pull-back = `aim`, release past threshold or button = `launch`, touch = `pet`, button tap = `call`, button hold = `pushToTalk`. Buzzer: `S:squeak` on catch, `S:chirp` per bounce.
+  **Note (2026-10-04, from Abel's `c/controller` journal):** the merged sketch sends `HELLO:zoomies:1` every 2s, repeating forever (not just once on boot/connect) — the reader must treat a repeat as a no-op, not re-run port-detect/reconnect logic each time it arrives.
 - [ ] **Bounce prediction + mid-air catch:** simulate the ball forward against the world SDF → landing point; if the path crosses a reachable point, `jumpTo` an intercept and catch.
 - [ ] **Window terrain:** platforms from window top edges + taskbar; route with walks + `jumpTo` arcs; ride a dragged window (follow its delta, jump off on large acceleration); fall + stumble when the window under the dog closes; **peek from behind** (dog behind a higher-z window is masked by that window's rect, peeks at the edge).
 - [ ] **ElevenLabs L2:** push-to-talk records mic → STT → `command` event; ears perk on press; clickable command buttons as fallback.
