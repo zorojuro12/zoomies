@@ -11,6 +11,7 @@ import type { FpsTier } from './behaviour/fps'
 import { timingFor } from './behaviour/timing'
 import { createDog } from './dog/create-dog'
 import { ClickThroughGate } from './host/click-through'
+import { CommandBar } from './host/command-bar'
 import { FrameStats } from './host/frame-stats'
 import { Hud, controllerHudText } from './host/hud'
 import { createRenderContext } from './host/scene'
@@ -63,6 +64,16 @@ async function start(): Promise<void> {
   }
   window.zoomies.onSerialStatus(onSerialStatus)
   window.zoomies.onInput((e) => behaviour?.handleInput(e))
+  // Clickable commands (and a text box in the windowed host): shown with ?commands=1 or the C key.
+  const commandBar = new CommandBar(
+    document.body,
+    (text) => behaviour?.handleInput({ kind: 'command', text }),
+    !overlay
+  )
+  commandBar.setVisible(searchParams.get('commands') === '1')
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'c' || e.key === 'C') commandBar.toggle()
+  })
   void window.zoomies.getSerialStatus().then(onSerialStatus)
   const world = new World()
   const worldView = new WorldView(ctx.scene)
@@ -230,7 +241,8 @@ async function start(): Promise<void> {
       const overInteractive =
         dog.hitTest(e.clientX, e.clientY) ||
         (!behaviour?.fetch.carrying && ballHit(ball, e.clientX, e.clientY)) ||
-        dragging
+        dragging ||
+        commandBar.hit(e.clientX, e.clientY)
       const next = gate.update(performance.now(), overInteractive)
       if (next !== null) window.zoomies.setClickThrough(next === 'clickThrough')
     })

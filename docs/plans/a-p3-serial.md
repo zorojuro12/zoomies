@@ -13,6 +13,9 @@
 | **A2** | **The pet hand:** a white cartoon glove slides down and strokes the dog's head for about 2.4 s when a `pet` happens (touch or mouse), `dog/hand/` | next |
 | **B** | **The reader:** `serialport`, auto-detect by `HELLO:zoomies:1` (repeats every 2 s forever: a repeat is a no-op), reconnect on unplug, fake port in tests. Files: `line-splitter.ts`, `serial-reader.ts`, `serial-driver.ts`; 6 s silence = dead, probe every port (Arduino-looking first), claim only the one that says HELLO | built (PR) |
 | **C** | **Wiring:** main process + preload + `main.ts` (forward `input:event`, `serial:status`, `serial:buzzer`; HUD status; double-click = call) | built (PR) |
+| **D1** | **Commands, the action layer (no AI, no network):** `behaviour/commands.ts` (seven commands + a forgiving fixed word list, also the fallback when the AI is offline), `Behaviour` runs them (sit, lie down, come, fetch, speak, good boy, trick; head tilt when not understood), sounds for speak / good boy, `host/command-bar.ts` (buttons; a text box in the windowed host; `?commands=1` / `ZOOMIES_COMMANDS=1` / the C key) | built (PR) |
+| **D2** | **Gemini function calling (PRD G3):** text in, one tool call out (the seven commands as tools), runs in the main process with the key from `.env`; falls back to the word list if offline | next |
+| **D3** | **Push-to-talk audio (PRD L2):** record only while the button is held, ElevenLabs speech-to-text, text into D2 | |
 
 ## Phase A decisions (Daniel confirmed the approach; numbers are tunable on the real device)
 - Joystick = a slingshot: the ball flies the OPPOSITE way to the pull. `aim` from a pull of 25% or more (about 30 per second); letting go (back under 15%) after a pull of at least 35% throws with the strongest pull; pressing the button while really aiming (25%+) throws at once and is not also a call; a stick held pulled for 8 s is given up on (no throw).
