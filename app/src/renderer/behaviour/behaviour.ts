@@ -8,9 +8,12 @@ import type { InputEvent } from '@shared/input'
 import type { ActivityEvent, WindowRect } from '@shared/os'
 import type { Ball } from '../world/ball'
 import type { World } from '../world/world-sdf'
+import { IDLE_NAMES } from '../dog/motion/idles'
 import { ActivityClassifier } from './activity'
 import type { ActivityNote } from './activity'
 import { Arbiter, chooseLook } from './arbiter'
+import { parseCommand } from './commands'
+import type { CommandName } from './commands'
 import { asExtras } from './dog-extras'
 import type { DogExtras } from './dog-extras'
 import type { FpsTier } from './fps'
@@ -53,6 +56,17 @@ const BOUNCE_GAP_MS = 80
 const AIM_HOLD_MS = 500
 /** A call keeps the dog for this long (it runs to the cursor, wags). */
 const CALL_HOLD_MS = 4500
+/** How long the dog holds each command's pose before it goes back to standing (ms). */
+const COMMAND_HOLD_MS: Record<CommandName, number> = {
+  sit: 6000,
+  lie_down: 8000,
+  come: 4500,
+  fetch: 0,
+  speak: 1500,
+  good_boy: 2500,
+  play_trick: 3000,
+  jump: 1500
+}
 /** A push-to-talk with no stop message (a loose wire) gives up after this long. */
 const TALK_MAX_MS = 10000
 
@@ -64,6 +78,8 @@ export type BehaviourEvent =
   | { kind: 'pet'; source: 'touch' | 'mouse' }
   | { kind: 'call' }
   | { kind: 'talk'; state: 'start' | 'stop' }
+  /** A command was given (name null = the dog did not understand it). */
+  | { kind: 'command'; name: CommandName | null }
   /** The ball bounced at x; strength 0..1 follows how hard it hit. */
   | { kind: 'bounce'; x: number; strength: number }
 
@@ -99,6 +115,8 @@ export class Behaviour {
   private aimUntilMs = 0
   private aimPower = 0
   private talking = false
+  private commanding = false
+  private trickIndex = 0
   private talkDeadlineMs = 0
   private calling = false
   private overlayKey = ''
@@ -168,6 +186,7 @@ export class Behaviour {
       }
       if (id === 'pet') this.endPet()
       if (id === 'call') this.endCall()
+      if (id === 'cmd') this.commanding = false
     })
   }
 
@@ -214,6 +233,8 @@ export class Behaviour {
       this.talking = e.state === 'start'
       this.talkDeadlineMs = this.clockMs + TALK_MAX_MS
       this.emit({ kind: 'talk', state: e.state })
+    } else if (e.kind === 'command') {
+      this.runCommand(parseCommand(e.text))
     } else if (e.kind === 'pet') {
       applyNeedsEvent(this.needs, 'pet')
       if (this.arbiter.request('command', 'pet', 1, PET_HOLD_MS)) {
@@ -416,9 +437,84 @@ export class Behaviour {
       if (this.arbiter.heldMs >= this.commandHoldMs) {
         if (this.petting) this.endPet()
         if (this.calling) this.endCall()
+        if (this.commanding) this.endCommand()
         this.arbiter.release(this.arbiter.id)
       }
     }
+  }
+
+  /** A command from the user (typed, spoken, or picked by the AI): the dog does it, or tilts its head. */
+  private runCommand(name: CommandName | null): void {
+    if (name === 'come') {
+      this.emit({ kind: 'command', name })
+      this.call()
+      return
+    }
+    if (this.fetch.active) return // a fetch is more important
+    if (name === 'fetch') {
+      // the dog goes for the ball and brings it to the cursor, like its own "play with me"
+      if (this.arbiter.owner === 'command') this.dropCommand()
+      const wa = this.world.getBounds()
+      const x = this.cursor.known ? this.cursor.x : this.dog.getState().x
+      if (this.fetch.bringBall(Math.min(Math.max(x, wa.x + 60), wa.x + wa.w - 60))) {
+        applyNeedsEvent(this.needs, 'pet')
+        this.emit({ kind: 'command', name })
+      }
+      return
+    }
+    if (this.arbiter.owner === 'command') this.dropCommand() // a new command replaces the old one
+    const holdMs = name === null ? 1500 : COMMAND_HOLD_MS[name]
+    if (!this.arbiter.request('command', 'cmd', 2, holdMs)) return
+    this.commandHoldMs = holdMs
+    this.commanding = true
+    this.emit({ kind: 'command', name })
+    if (name !== null) applyNeedsEvent(this.needs, 'pet') // you paid it attention
+    switch (name) {
+      case 'sit':
+        void this.dog.setPose('sit')
+        this.extras.setMood('happy', 0.6)
+        break
+      case 'lie_down':
+        void this.dog.setPose('lie')
+        this.extras.setMood('happy', 0.4)
+        break
+      case 'good_boy':
+        void this.dog.setPose('playBow')
+        this.extras.setMood('happy', 1)
+        this.dog.setLayer({ tailWag: 1 })
+        break
+      case 'speak':
+        this.extras.setMood('happy', 0.8)
+        break
+      case 'jump': {
+        // a hop on the spot: up and back down at the same place
+        const at = this.dog.getState()
+        void this.dog.jumpTo(at.x, at.y, { apexPx: 70 })
+        this.extras.setMood('happy', 0.8)
+        break
+      }
+      case 'play_trick':
+        void this.extras.playIdle(IDLE_NAMES[this.trickIndex++ % IDLE_NAMES.length])
+        break
+      default:
+        void this.dog.setPose('headTilt') // did not understand
+    }
+  }
+
+  /** A running command ends: the dog goes back to standing, calm. */
+  private endCommand(): void {
+    this.commanding = false
+    this.dog.setLayer({ tailWag: 0.5 })
+    this.extras.setMood('neutral', 0)
+    void this.dog.setPose('stand')
+  }
+
+  /** Stop the running command without standing up (the next thing sets its own pose). */
+  private dropCommand(): void {
+    if (this.petting) this.endPet()
+    if (this.calling) this.endCall()
+    this.commanding = false
+    this.arbiter.release(this.arbiter.id)
   }
 
   /** The dog is called (button tap): it runs to the cursor, wags and is happy for a moment. */

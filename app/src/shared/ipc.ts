@@ -11,6 +11,10 @@ export interface IpcChannels {
   'input:event': InputEvent
   'serial:status': { connected: boolean; port: string | null }
   'serial:buzzer': { preset: 'squeak' | 'chirp' }
+  /** invoke: renderer sends the text, main answers with a command name, 'none' or 'error' (D2, Gemini). */
+  'command:interpret': string
+  /** invoke: a push-to-talk recording in, the words heard out ('' = nothing heard or it failed) (D3, ElevenLabs). */
+  'speech:transcribe': { audio: Uint8Array; mime: string }
 }
 
 export type IpcChannel = keyof IpcChannels

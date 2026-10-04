@@ -857,12 +857,196 @@ describe('the controller: aim, call, push-to-talk', () => {
     h.b.handleInput({ kind: 'pushToTalk', state: 'start' })
     expect(h.b.fpsTier()).toBe('full')
   })
+})
 
-  it('the other inputs (command text, ...) are ignored for now and do not crash', () => {
+describe('commands (typed, spoken, or picked by the AI)', () => {
+  const say = (h: H, text: string): void => h.b.handleInput({ kind: 'command', text })
+  const events = (h: H): BehaviourEvent[] => {
+    const out: BehaviourEvent[] = []
+    h.b.onEvent((e) => out.push(e))
+    return out
+  }
+
+  it('sit: sits, and gets up again after about six seconds', () => {
     const h = mk()
-    h.b.handleInput({ kind: 'command', text: 'sit' })
+    say(h, 'sit')
+    run(h, 0.2)
+    expect(h.dog.pose).toBe('sit')
+    run(h, 4)
+    expect(h.dog.pose).toBe('sit')
+    run(h, 3)
+    expect(h.dog.pose).toBe('stand')
+    expect(h.b.arbiter.owner).toBe('none')
+  })
+
+  it('lie down: lies, and gets up after about eight seconds', () => {
+    const h = mk()
+    say(h, 'lie down')
+    run(h, 0.2)
+    expect(h.dog.pose).toBe('lie')
+    activeFor(h, 6) // (the user stays active, so the dog's own idle sit does not kick in)
+    expect(h.dog.pose).toBe('lie')
+    activeFor(h, 3)
+    expect(h.dog.pose).toBe('stand')
+  })
+
+  it('come: runs to the cursor', () => {
+    const h = mk({ dogX: 1700 })
+    mouse(h, 600, 50)
+    say(h, 'come here')
+    run(h, 0.2)
+    expect(h.dog.log.some((l) => l.startsWith('moveTo run'))).toBe(true)
+    run(h, 3)
+    expect(Math.abs(h.dog.x - 600)).toBeLessThan(30)
+  })
+
+  it('fetch: goes for the resting ball', () => {
+    const h = mk({ dogX: 1500 })
+    say(h, 'go get it')
+    run(h, 0.5)
+    expect(h.b.fetch.active).toBe(true)
+    expect(h.dog.log.some((l) => l.startsWith('moveTo'))).toBe(true)
+  })
+
+  it('fetch with the ball not available does nothing (and does not crash)', () => {
+    const h = mk()
+    h.ball.held = true
+    expect(() => say(h, 'fetch')).not.toThrow()
+    run(h, 0.5)
+    expect(h.b.fetch.active).toBe(false)
+  })
+
+  it('jump: hops on the spot (up and down at the same place), then stands', () => {
+    const h = mk()
+    const x = h.dog.x
+    say(h, 'jump')
+    run(h, 0.2)
+    expect(h.dog.log).toContain(`jumpTo ${Math.round(x)} ${GROUND} 70`)
+    activeFor(h, 3)
+    expect(h.dog.pose).toBe('stand')
+    expect(h.b.arbiter.owner).toBe('none')
+  })
+
+  it('speak: a command event for the bark, and the dog stays standing', () => {
+    const h = mk()
+    const ev = events(h)
+    say(h, 'bark')
+    run(h, 0.2)
+    expect(ev).toContainEqual({ kind: 'command', name: 'speak' })
+    expect(h.dog.pose).not.toBe('sit')
+  })
+
+  it('good boy: happy, tail wagging, and the dog counts it as attention', () => {
+    const h = mk()
+    const quiet = mk()
+    say(h, 'good boy')
+    run(h, 0.2)
+    run(quiet, 0.2)
+    expect(h.dog.moods.some((m) => m.startsWith('happy'))).toBe(true)
+    expect(h.dog.layers.some((l) => l.tailWag === 1)).toBe(true)
+    expect(h.b.needs.attention).toBeGreaterThan(quiet.b.needs.attention)
+  })
+
+  it('play a trick: plays an idle trick, a different one each time', () => {
+    const h = mk()
+    for (let i = 0; i < 3; i++) {
+      say(h, 'do a trick')
+      run(h, 4)
+    }
+    expect(h.dog.idles).toHaveLength(3)
+    expect(new Set(h.dog.idles).size).toBe(3)
+  })
+
+  it('something that is not a command: head tilt for a moment, then back to standing', () => {
+    const h = mk()
+    const ev = events(h)
+    say(h, 'what is the weather')
+    run(h, 0.2)
+    expect(h.dog.pose).toBe('headTilt')
+    expect(ev).toContainEqual({ kind: 'command', name: null })
+    run(h, 2)
+    expect(h.dog.pose).toBe('stand')
+  })
+
+  it('a new command replaces the one running (sit, then lie down 1 s later)', () => {
+    const h = mk()
+    say(h, 'sit')
     run(h, 1)
-    expect(h.dog.log).toEqual([])
+    say(h, 'lie down')
+    run(h, 0.2)
+    expect(h.dog.pose).toBe('lie')
+    activeFor(h, 7) // the new command gets its own full eight seconds (not what was left of the sit)
+    expect(h.dog.pose).toBe('lie')
+    activeFor(h, 2)
+    expect(h.dog.pose).toBe('stand')
+    expect(poses(h.dog).filter((p) => p === 'stand')).toHaveLength(1)
+  })
+
+  it('a fetch in progress is not interrupted by a command', () => {
+    const h = mk()
+    h.ball.resting = false
+    h.ball.vx = 700
+    h.ball.vy = -900
+    h.b.handleInput({ kind: 'launch', angle: -1, power: 1 })
+    run(h, 0.3)
+    say(h, 'sit')
+    run(h, 0.5)
+    expect(poses(h.dog)).not.toContain('sit')
+  })
+
+  it('a command wakes a sleeping dog', () => {
+    const h = mk()
+    idleFor(h, 21)
+    expect(h.b.activity.state.user).toBe('asleep')
+    say(h, 'sit')
+    expect(h.b.activity.state.user).toBe('active')
+    expect(h.b.fpsTier()).toBe('full')
+  })
+
+  it('the names Gemini sends work too', () => {
+    for (const n of [
+      'sit',
+      'lie_down',
+      'come',
+      'fetch',
+      'speak',
+      'good_boy',
+      'play_trick',
+      'jump'
+    ]) {
+      const h = mk()
+      const ev = events(h)
+      say(h, n)
+      run(h, 0.2)
+      expect(ev).toContainEqual({ kind: 'command', name: n })
+    }
+  })
+
+  it('survives 3,000 random commands mixed with time (never throws, always ends up free)', () => {
+    let seed = 3
+    const rand = (): number => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+      return seed / 4294967296
+    }
+    const texts = [
+      'sit',
+      'lie down',
+      'come',
+      'fetch',
+      'speak',
+      'good boy',
+      'trick',
+      'blah',
+      '',
+      'sit down come'
+    ]
+    const h = mk()
+    for (let i = 0; i < 3000; i++) {
+      say(h, texts[Math.floor(rand() * texts.length)])
+      run(h, rand() * 2)
+    }
+    run(h, 60)
+    expect(h.b.arbiter.owner === 'none' || h.b.arbiter.owner === 'reaction').toBe(true)
   })
 })
 

@@ -46,7 +46,8 @@ export class FakeDog implements DogController {
     })
   }
 
-  jumpTo(): Promise<void> {
+  jumpTo(x: number, y: number, opts?: { apexPx?: number }): Promise<void> {
+    this.log.push(`jumpTo ${Math.round(x)} ${Math.round(y)} ${opts?.apexPx ?? ''}`.trim())
     return Promise.resolve()
   }
 

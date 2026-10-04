@@ -6,14 +6,20 @@ import { createAudioPlayer } from './audio'
 import { PetHand } from './dog/hand/hand-view'
 import { handAnchor } from './dog/hand/head-anchor'
 import { Behaviour } from './behaviour/behaviour'
+import { BuzzerCues } from './behaviour/buzzer-cues'
 import { SoundCues } from './behaviour/cues'
 import { FrameGovernor } from './behaviour/fps'
 import type { FpsTier } from './behaviour/fps'
 import { timingFor } from './behaviour/timing'
 import { createDog } from './dog/create-dog'
 import { ClickThroughGate } from './host/click-through'
+import { CommandBar } from './host/command-bar'
+import { routeCommand } from './host/command-router'
+import { createBrowserVoiceInput } from './host/voice-input'
+import { handleClip } from './host/voice-flow'
+import type { InputEvent } from '@shared/input'
 import { FrameStats } from './host/frame-stats'
-import { Hud } from './host/hud'
+import { Hud, controllerHudText } from './host/hud'
 import { createRenderContext } from './host/scene'
 import { createBall, stepBall } from './world/ball'
 import type { Ball } from './world/ball'
@@ -53,6 +59,77 @@ async function start(): Promise<void> {
   const hud = new Hud(status)
   // The dog's personality (needs, reactions, fetch, adaptive frame rate): created once the dog exists.
   let behaviour: Behaviour | null = null
+  // The controller (Arduino, via the main process): its events drive the dog like the mouse does,
+  // and the buzzer only gets requests while a board is actually connected.
+  let buzzer: BuzzerCues | null = null
+  let controllerConnected = false
+  let controllerSeen = false
+  const onSerialStatus = (s: { connected: boolean; port: string | null }): void => {
+    controllerConnected = s.connected
+    if (s.connected) controllerSeen = true
+    buzzer?.setEnabled(s.connected)
+    hud.set('controller', controllerHudText(s, controllerSeen))
+  }
+  window.zoomies.onSerialStatus(onSerialStatus)
+  // Push-to-talk: the mic is open ONLY while the button is held (controller, the on-screen button, or space).
+  const sendCommand = (text: string): void => behaviour?.handleInput({ kind: 'command', text })
+  // Text -> command via the AI (main process); the screen shows what it decided.
+  const interpret = async (t: string): Promise<string> => {
+    const a = await window.zoomies.interpret(t)
+    hud.set('voice', `"${t}" -> ${a === 'error' ? 'word list (AI unavailable)' : a}`)
+    return a
+  }
+  const voice = createBrowserVoiceInput(
+    (bytes, mime) =>
+      void handleClip(
+        bytes,
+        mime,
+        async (b, m) => window.zoomies.transcribe(b, m),
+        (text) => void routeCommand(text, interpret, sendCommand),
+        sendCommand,
+        (message) => {
+          console.log(`[voice] ${message}`)
+          hud.set('voice', message)
+        }
+      ),
+    (message) => {
+      console.warn(`[voice] ${message}`)
+      hud.set('voice', message)
+    }
+  )
+  const input = (e: InputEvent): void => {
+    behaviour?.handleInput(e)
+    if (e.kind === 'pushToTalk') {
+      hud.set('voice', e.state === 'start' ? 'listening…' : 'sending…')
+      if (e.state === 'start') voice.start()
+      else voice.stop()
+    }
+  }
+  window.zoomies.onInput(input)
+  let spaceDown = false
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || e.repeat || spaceDown || e.target instanceof HTMLInputElement) return
+    spaceDown = true
+    input({ kind: 'pushToTalk', state: 'start' })
+  })
+  window.addEventListener('keyup', (e) => {
+    if (e.code !== 'Space' || !spaceDown) return
+    spaceDown = false
+    input({ kind: 'pushToTalk', state: 'stop' })
+  })
+  // Clickable commands (and a text box in the windowed host): shown with ?commands=1 or the C key.
+  const send = sendCommand
+  const commandBar = new CommandBar(
+    document.body,
+    send,
+    overlay ? null : (text) => void routeCommand(text, interpret, send),
+    (state) => input({ kind: 'pushToTalk', state })
+  )
+  commandBar.setVisible(searchParams.get('commands') === '1')
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'c' || e.key === 'C') commandBar.toggle()
+  })
+  void window.zoomies.getSerialStatus().then(onSerialStatus)
   const world = new World()
   const worldView = new WorldView(ctx.scene)
   worldView.setDebug(debug)
@@ -111,6 +188,7 @@ async function start(): Promise<void> {
   dog.placeAt(homeX, groundY())
   void dog.moveTo(homeX - 3, groundY(), 'walk')
 
+  if (searchParams.get('log') === '1') Object.assign(window, { __dog: dog }) // dev: poke it from the console
   const ball = createBall(window.innerWidth / 2, groundY() - 200)
   if (behaviourOn) {
     behaviour = new Behaviour({
@@ -137,6 +215,13 @@ async function start(): Promise<void> {
       muted
     })
     brain.onEvent((e) => cues?.handle(e))
+    if (searchParams.get('log') === '1')
+      brain.onEvent((e) => {
+        if (e.kind !== 'bounce') console.log(`[dog] ${JSON.stringify(e)}`)
+      })
+    buzzer = new BuzzerCues((p) => window.zoomies.buzz(p))
+    buzzer.setEnabled(controllerConnected)
+    brain.onEvent((e) => buzzer?.handle(e))
   }
   // The pet hand: a white glove strokes the dog's head whenever it is petted (the touch sensor or a click).
   let hand: PetHand | null = null
@@ -204,6 +289,8 @@ async function start(): Promise<void> {
       if (dog.hitTest(e.clientX, e.clientY))
         behaviour?.handleInput({ kind: 'pet', source: 'mouse' })
     })
+    // Double-click = call (the mouse twin of the controller's button tap).
+    window.addEventListener('dblclick', () => behaviour?.handleInput({ kind: 'call' }))
   } else {
     window.addEventListener('mousemove', (e) => dog.lookAt({ x: e.clientX, y: e.clientY }))
     if (!overlay) {
@@ -224,7 +311,8 @@ async function start(): Promise<void> {
       const overInteractive =
         dog.hitTest(e.clientX, e.clientY) ||
         (!behaviour?.fetch.carrying && ballHit(ball, e.clientX, e.clientY)) ||
-        dragging
+        dragging ||
+        commandBar.hit(e.clientX, e.clientY)
       const next = gate.update(performance.now(), overInteractive)
       if (next !== null) window.zoomies.setClickThrough(next === 'clickThrough')
     })
@@ -264,6 +352,7 @@ async function start(): Promise<void> {
     const workStart = performance.now()
     stepBall(ball, world, frameMs)
     behaviour?.update(frameMs)
+    buzzer?.update(frameMs)
     cues?.update(frameMs)
     worldView.setBall(behaviour?.fetch.carrying ? hiddenBall : ball)
     if (!behaviour && !ball.resting) dog.lookAt({ x: ball.x, y: ball.y })
