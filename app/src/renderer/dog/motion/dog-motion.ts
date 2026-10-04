@@ -388,7 +388,11 @@ export class DogMotion implements DogController {
 
   /** Screen rect around the dog: used for click tests and for region rendering. */
   getBounds(): Rect {
-    const w = this.heightPx * 2.2
+    // Width narrowed from 2.2x to 1.6x height (2026-10-04, Ansh — flagged to Daniel): the old
+    // value made the left/right click-through margin noticeably wider than the vertical one,
+    // which doesn't track a standing dog's silhouette. Not pose-aware (heightPx is fixed per
+    // dog) — revisit if a running/fetching pose needs a wider box.
+    const w = this.heightPx * 1.6
     const h = this.heightPx * 1.25
     return { x: this.x - w / 2, y: this.y - h + 12, w, h }
   }
