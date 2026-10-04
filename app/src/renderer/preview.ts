@@ -11,7 +11,9 @@ import { buildDog } from './dog/spec/build-dog'
 import { normalizeSpec } from './dog/spec/dog-spec'
 import { mountSpecEditor } from './ui/editor/spec-editor'
 import { createRenderContext, loadJson } from './host/scene'
+import { createAudioPlayer } from './audio'
 import { Behaviour } from './behaviour/behaviour'
+import { SoundCues } from './behaviour/cues'
 import { Fetch } from './behaviour/fetch'
 import { FrameGovernor } from './behaviour/fps'
 import type { FpsTier } from './behaviour/fps'
@@ -173,6 +175,37 @@ async function start(): Promise<void> {
           hour: () => (hourOverride >= 0 ? hourOverride : new Date().getHours())
         })
       : null
+    // The dog's voice (?mute=1 starts quiet; ?audiolog=1 prints every sound to the console).
+    let cues: SoundCues | null = null
+    if (behaviour) {
+      const brain = behaviour
+      const real = createAudioPlayer()
+      void real.preload()
+      const player =
+        params.get('audiolog') === '1'
+          ? {
+              preload: () => real.preload(),
+              stop: (n: Parameters<typeof real.stop>[0]) => {
+                console.log('[sound] stop', n)
+                real.stop(n)
+              },
+              playSound: (
+                n: Parameters<typeof real.playSound>[0],
+                o?: Parameters<typeof real.playSound>[1]
+              ) => {
+                console.log('[sound]', n, JSON.stringify(o ?? {}))
+                real.playSound(n, o)
+              }
+            }
+          : real
+      cues = new SoundCues(player, {
+        screenW: () => window.innerWidth,
+        dogX: () => dog.getState().x,
+        cursorX: () => brain.cursorX(),
+        muted: params.get('mute') === '1'
+      })
+      brain.onEvent((e) => cues?.handle(e))
+    }
     const fetch = behaviour ? behaviour.fetch : new Fetch({ dog, ball, world, groundY })
     fetch.onNote((n) => console.log('[fetch]', n))
     const shelf = {
@@ -316,14 +349,17 @@ async function start(): Promise<void> {
         behaviour.needs.energy = 0.1
       })
       button('pet', () => behaviour.handleInput({ kind: 'pet', source: 'mouse' }))
+      button('mute on/off', () => cues?.setMuted(!cues.muted))
       button('late night on/off', () => {
         hourOverride = hourOverride < 0 ? 23 : -1
       })
     }
     tickFetch = (dtMs) => {
       stepBall(ball, world, dtMs)
-      if (behaviour) behaviour.update(dtMs)
-      else fetch.update(dtMs)
+      if (behaviour) {
+        behaviour.update(dtMs)
+        cues?.update(dtMs)
+      } else fetch.update(dtMs)
       worldView.setBall(fetch.carrying ? hiddenBall : ball) // hidden while it is in the dog's mouth
       fetchState = behaviour ? behaviour.describe() : `fetch ${fetch.state}`
     }

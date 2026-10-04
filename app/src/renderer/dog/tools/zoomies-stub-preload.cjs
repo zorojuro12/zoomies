@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- a CommonJS preload script (Electron loads it with require) */
 // Stand-in for the app's preload (Lane B dev tool, used by shot.mjs --stub): gives the host page a fake
 // `window.zoomies` (empty window list, a work area, no real OS) and lets the harness inject activity events
 // with `window.__stub.emit({ kind: 'idle', seconds: 25 })`, so the REAL index.html can be run on a Mac.

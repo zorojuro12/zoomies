@@ -8,6 +8,7 @@ import { createBall, stepBall } from '../world/ball'
 import type { Ball } from '../world/ball'
 import { World } from '../world/world-sdf'
 import { Behaviour } from './behaviour'
+import type { BehaviourEvent } from './behaviour'
 import { FakeDog } from './fake-dog'
 import { BEHAVIOUR_TIMING, DEMO_TIMING } from './timing'
 
@@ -562,6 +563,138 @@ describe('long frames (the slow rate): time still passes at the right speed', ()
     expect(a.b.needs.boredom).toBeCloseTo(b.b.needs.boredom, 6)
     expect(a.b.needs.attention).toBeCloseTo(b.b.needs.attention, 6)
     expect(a.b.activity.state.idleSec).toBeCloseTo(b.b.activity.state.idleSec, 6)
+  })
+})
+
+describe('events (what the sounds listen to)', () => {
+  const collect = (h: H): BehaviourEvent[] => {
+    const out: BehaviourEvent[] = []
+    h.b.onEvent((e) => out.push(e))
+    return out
+  }
+
+  it('a fetch reports each step, in order', () => {
+    const h = mk()
+    const ev = collect(h)
+    h.ball.resting = false
+    h.ball.vx = 700
+    h.ball.vy = -900
+    h.b.handleInput({ kind: 'launch', angle: -1, power: 1 })
+    run(h, 40)
+    const notes = ev.filter((e) => e.kind === 'fetch').map((e) => (e as { note: string }).note)
+    expect(notes).toEqual(['launched', 'pickedUp', 'returning', 'dropped', 'done'])
+  })
+
+  it('going idle, sleeping and coming back are reported', () => {
+    const h = mk()
+    const ev = collect(h)
+    idleFor(h, 21)
+    mouse(h, 400, 300)
+    const notes = ev.filter((e) => e.kind === 'activity').map((e) => (e as { note: string }).note)
+    expect(notes).toEqual(['wentIdle', 'fellAsleep', 'returned'])
+  })
+
+  it('a reaction reports when it starts and when it ends (even when something takes the dog)', () => {
+    const h = mk()
+    const ev = collect(h)
+    idleFor(h, 20) // sleeping
+    const sleeps = (): string[] =>
+      ev
+        .filter((e) => e.kind === 'reaction' && e.id === 'sleep')
+        .map((e) => (e as { phase: string }).phase)
+    expect(sleeps()).toEqual(['start'])
+    mouse(h, 400, 300) // wakes it: the greeting takes the dog
+    run(h, 0.2)
+    expect(sleeps()).toEqual(['start', 'end'])
+    expect(ev.some((e) => e.kind === 'reaction' && e.id === 'greet' && e.phase === 'start')).toBe(
+      true
+    )
+  })
+
+  it('a reaction that is interrupted (not finished) still reports its end', () => {
+    const h = mk()
+    const ev = collect(h)
+    type(h, 4, 3) // lying beside you: still going when the throw comes
+    h.ball.resting = false
+    h.ball.vx = 700
+    h.ball.vy = -900
+    h.b.handleInput({ kind: 'launch', angle: -1, power: 1 })
+    run(h, 0.2)
+    const phases = ev
+      .filter((e) => e.kind === 'reaction' && e.id === 'typing')
+      .map((e) => (e as { phase: string }).phase)
+    expect(phases).toEqual(['start', 'end'])
+  })
+
+  it('a pet is reported', () => {
+    const h = mk()
+    const ev = collect(h)
+    h.b.handleInput({ kind: 'pet', source: 'mouse' })
+    expect(ev.some((e) => e.kind === 'pet')).toBe(true)
+  })
+
+  it('you can stop listening', () => {
+    const h = mk()
+    const ev: BehaviourEvent[] = []
+    const off = h.b.onEvent((e) => ev.push(e))
+    off()
+    h.b.handleInput({ kind: 'pet', source: 'mouse' })
+    expect(ev).toEqual([])
+  })
+})
+
+describe('ball bounces (for the bounce sound)', () => {
+  const bounces = (h: H, seconds: number): { x: number; strength: number }[] => {
+    const out: { x: number; strength: number }[] = []
+    h.b.onEvent((e) => {
+      if (e.kind === 'bounce') out.push({ x: e.x, strength: e.strength })
+    })
+    run(h, seconds)
+    return out
+  }
+
+  it('a dropped ball bounces several times, each softer than the last, then settles quietly', () => {
+    const h = mk()
+    h.ball.x = 600
+    h.ball.y = 100
+    h.ball.resting = false
+    const b = bounces(h, 6)
+    expect(b.length).toBeGreaterThanOrEqual(2)
+    for (let i = 1; i < b.length; i++) expect(b[i]!.strength).toBeLessThan(b[i - 1]!.strength)
+    expect(b.every((e) => Math.abs(e.x - 600) < 5)).toBe(true) // dropped straight down: still at x = 600
+    expect(bounces(h, 3)).toEqual([]) // at rest: silence
+  })
+
+  it('a harder impact is a bigger strength (0..1)', () => {
+    const soft = mk()
+    soft.ball.x = 600
+    soft.ball.y = 700
+    soft.ball.resting = false
+    const hard = mk()
+    hard.ball.x = 600
+    hard.ball.y = 100
+    hard.ball.resting = false
+    const s = bounces(soft, 2)[0]!
+    const d = bounces(hard, 3)[0]!
+    expect(d.strength).toBeGreaterThan(s.strength)
+    expect(d.strength).toBeLessThanOrEqual(1)
+    expect(s.strength).toBeGreaterThan(0)
+  })
+
+  it('the top of a throw (the ball turning round slowly) is not a bounce', () => {
+    const h = mk()
+    h.ball.x = 600
+    h.ball.y = 900
+    h.ball.vy = -700 // flies up, slows, turns, falls
+    h.ball.resting = false
+    const b = bounces(h, 0.6) // up and back down, before it reaches the floor again
+    expect(b).toEqual([])
+  })
+
+  it("a ball in the dog's mouth, or in the player's hand, makes no bounce sounds", () => {
+    const h = mk()
+    h.ball.held = true
+    expect(bounces(h, 1)).toEqual([])
   })
 })
 
