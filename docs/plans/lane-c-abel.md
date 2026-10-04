@@ -21,9 +21,9 @@
 | Folder / file | Contents |
 |---|---|
 | `assets/photo/dog.jpeg` | The source photo (replace with the full-size original if Huawei's folder has one — same filename) |
-| `assets/views/` | Gemini-generated views + `landmarks.json` |
+| `assets/views/` | Gemini-generated side/back views (+ `landmarks.json` only if the P3 optimiser happens) |
 | `assets/sounds/` | The dog's sound library (+ `SOUNDS.md` listing the names) |
-| `scripts/` | Small helper tools: landmark picker, sound generation/processing |
+| `scripts/` | Small helper tools: sound generation/processing (landmark picker only if needed in P3) |
 | `app/src/renderer/audio/` | Audio playback module (`playSound`, contract §3.8) |
 | `hardware/arduino/zoomies_controller/` | Arduino sketch (serial protocol §3.7) |
 | `docs/qa.md` | QA log |
@@ -34,7 +34,7 @@
 | | From / to | What | When |
 |---|---|---|---|
 | **Provides** ⚡ | everyone | Huawei Drive folder checked; photo in `assets/photo/` | P0, first thing |
-| **Provides** ⚡ | Daniel | Side + back views + `landmarks.json` | Early P1 |
+| **Provides** | Daniel | Side + back views — only to colour the sides the photo can't see | By end of P2 (not urgent) |
 | **Provides** | Ansh | Sound library + audio module | Mid P2 |
 | **Provides** | Ansh | Arduino sketch + wired controller | Start P3 |
 | **Needs** | Daniel | Pose & shape editor | End P2 (for likeness tuning in P3) |
@@ -49,9 +49,21 @@
 - [ ] Contracts review (with Ansh + Daniel): check the **landmarks format** (`00-shared.md` §3.9, `app/src/shared/landmarks.ts`), the **sound names** (`SOUND_NAMES` in `app/src/shared/audio.ts`), and the **serial protocol** (§3.7, `app/src/shared/serial.ts`).
 - **Done when (CP0):** the app runs on your Mac with the placeholder dog.
 
-## P1 — The dog's source material ⚡ (start immediately — Daniel is waiting on it)
+## P1 — The dog's voice, the breadboard, and the views
 
-### 1. Generate views with Gemini (Google AI Studio, image model — e.g. "Nano Banana"; check what AI Studio offers)
+> **Changed 2026-10-03:** Daniel's pipeline now gets the dog's proportions and colours from a **Gemini "dog spec"** (see `lane-b-daniel.md`), not from hand-marked landmarks. So the **landmark picker is no longer needed** (only if the P3 optimiser happens), and the **side/back views aren't urgent** — they only colour the sides the photo can't see, by the end of P2. Start with the sounds and the breadboard.
+
+### 1. Plan and start the sounds ⚡ → `assets/sounds/SOUNDS.md`
+Sound names are fixed in `SOUND_NAMES` (`app/src/shared/audio.ts`), 2–3 variants each, numbered `_1`, `_2`, `_3`:
+`bark_happy · bark_alert · yip_excited · whine · pant · yawn · snore · sneeze · sigh · paw_step · ball_bounce · ball_squeak`
+- [ ] Write a one-line ElevenLabs prompt per sound in `SOUNDS.md`.
+- [ ] Generate the four most important first in the ElevenLabs Sound Effects tool: `bark_happy`, `pant`, `snore`, `ball_squeak` (then the rest in P2).
+
+### 2. Wire the breadboard (MLH kit — no soldering, no glue)
+- [ ] Joystick (2 analog pins + its button), button, touch sensor, buzzer → Arduino. Draw/photograph the wiring.
+- [ ] Test each part with the Arduino IDE's built-in examples (AnalogReadSerial, Button, toneMelody).
+
+### 3. Generate views with Gemini (not urgent — by end of P2) (Google AI Studio, image model — e.g. "Nano Banana"; check what AI Studio offers)
 Upload `assets/photo/dog.jpeg` each time and ask for **one change at a time** — changing pose *and* angle together makes Gemini drift into a different dog.
 
 | File | What to ask for | Used for |
@@ -68,25 +80,19 @@ Example prompt: *"This exact dog, identical markings and colours (black coat, wh
 - [ ] Same proportions (not slimmer, not puppy-like)
 - [ ] Full body in frame, plain background
 
-### 2. Mark landmarks → `assets/views/landmarks.json`
-- [ ] With Claude, build a tiny **landmark picker**: `scripts/landmark_picker.html` — open an image, click points in order, it shows the name being placed and downloads JSON in the agreed format (`00-shared.md` §3.9; names in `app/src/shared/landmarks.ts`). Good first Claude task (~20 min).
-- [ ] Mark `front` (the original photo), `side_sit`, `side_stand`, `back` — only the points visible in each view.
-- [ ] Commit views + JSON on `c/views`, PR into `dev`, tell Daniel.
+- [ ] Commit the views on `c/views`, PR into `dev`, tell Daniel.
 
-### 3. Plan the sounds → `assets/sounds/SOUNDS.md`
-Sound names (agree in the contracts session; 2–3 variants each, numbered `_1`, `_2`, `_3`):
-`bark_happy · bark_alert · yip_excited · whine · pant · yawn · snore · sneeze · sigh · paw_step · ball_bounce · ball_squeak`
+### 4. Landmarks — optional (only if Daniel asks for the P3 optimiser)
+If it happens: a tiny **landmark picker** (`scripts/landmark_picker.html`, with Claude) that downloads JSON in the `00-shared.md` §3.9 format. Skip it otherwise.
 
-### 4. Wire the breadboard (MLH kit — no soldering, no glue)
-- [ ] Joystick (2 analog pins + its button), button, touch sensor, buzzer → Arduino. Draw/photograph the wiring.
-- [ ] Test each part with the Arduino IDE's built-in examples (AnalogReadSerial, Button, toneMelody).
-- **Done when (CP1):** views + landmarks merged; sound list agreed; every hardware part responds in the Serial Monitor.
+- **Done when (CP1):** `SOUNDS.md` written and the first four sounds generated; every hardware part responds in the Serial Monitor. Views: started if there was time.
 
 ## P2 — The dog's voice + the controller sketch
-- [ ] **ElevenLabs sound library (L1, a Must):** generate each sound in the ElevenLabs Sound Effects tool (or with a small script in `scripts/` via Claude), 2–3 variants each. Trim silence, keep them short (< 2 s, except `snore`/`pant` loops), similar loudness, export small `.mp3`/`.ogg`. Save as `assets/sounds/<name>_<n>.mp3`.
+- [ ] **ElevenLabs sound library (L1, a Must):** finish generating each sound in the ElevenLabs Sound Effects tool (or with a small script in `scripts/` via Claude), 2–3 variants each. Trim silence, keep them short (< 2 s, except `snore`/`pant` loops), similar loudness, export small `.mp3`/`.ogg`. Save as `assets/sounds/<name>_<n>.mp3`.
 - [ ] **Audio module** (with Claude) in `app/src/renderer/audio/`: `playSound(name, { pan, gain })` per contract §3.8 — preload all files, pick a random variant, stereo pan with `StereoPannerNode`, gain, looping for `snore`/`pant`. Add a small test page/button to hear every sound.
 - [ ] **Arduino sketch** (with Claude) `hardware/arduino/zoomies_controller/`: send `HELLO:zoomies:1` on boot, `J:x,y` (~30 Hz while moving), `B:0/1`, `T:0/1`; receive `Z:freq,ms`, `S:squeak`, `S:chirp` and play them on the buzzer. Test everything in the Serial Monitor.
-- **Done when (CP2):** sounds + audio module merged and audible in the app; sketch merged and working in the Serial Monitor.
+- [ ] **Gemini side/back views** (P1 §3) if not done yet.
+- **Done when (CP2):** sounds + audio module merged and audible in the app; sketch merged and working in the Serial Monitor; side/back views merged.
 
 ## P3 — Hardware live + likeness
 - [ ] **With Ansh on the Windows laptop:** controller → app end to end (aim, launch, pet, call, push-to-talk, squeak on catch).
@@ -115,7 +121,7 @@ Sound names (agree in the contracts session; 2–3 variants each, numbered `_1`,
 | Risk | Mitigation |
 |---|---|
 | Gemini makes a "different dog" | One change at a time; check list above; regenerate; Daniel can start from the front photo alone |
-| Landmarks slow to mark by hand | The picker tool; only visible points per view |
+| Gemini views drift into a different dog | Not on the critical path any more — Daniel falls back to front-photo colours |
 | ElevenLabs credits run out | Generate the must-have sounds first (bark_happy, pant, snore, ball_squeak); reuse variants |
 | Hardware part doesn't work | Test each part alone first; the mouse fallback means the demo never depends on it |
 | New to Claude Code | Default permission mode, `c/` branches, ask Ansh/Daniel after 15 minutes stuck |
