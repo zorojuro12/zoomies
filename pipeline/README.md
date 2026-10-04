@@ -4,7 +4,7 @@ Build-time: **dog photo → Gemini → dog spec** (`assets/dog/<name>.spec.json`
 into a dog (`buildDog`), so any photo of any dog works. See `docs/plans/b-p2-spec-and-motion.md` (step F).
 
 ```
-photo ─► Gemini (3 calls in parallel, 15 s timeout) ─► median of the answers ─► snap colours to the photo ─► spec.json
+photo ─► Gemini (5 calls in parallel, 15 s timeout) ─► median of the answers ─► snap colours to the photo ─► spec.json
               └─ if every call fails: the default template dog (never hangs, never crashes)
 ```
 
@@ -29,7 +29,8 @@ python -m zoomies_pipeline.photo_to_spec ../assets/photo/dog.jpeg --name aussie-
 
 Writes `assets/dog/aussie-gemini.spec.json` and prints how many calls succeeded and which colours
 were snapped. Look at it in the app: `/preview.html?spec=aussie-gemini` (add `&edit=1` to tune it).
-Options: `--calls 3` · `--timeout 15` · `--model gemini-2.5-flash` · `--out path`.
+Options: `--calls 5` · `--timeout 15` · `--model gemini-3.8-flash` · `--snap-delta 10` (0 = never snap) · `--out path`.
+The model name was checked against the live model list: `gemini-2.5-flash` is listed but returns 404 for new keys.
 
 ## Files
 
