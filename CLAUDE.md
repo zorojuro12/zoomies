@@ -64,6 +64,12 @@ verified on **macOS** (Abel, 2026-10-03) and **Windows** (Ansh, 2026-10-04).
 | `npm run lint` / `npm run format` | ESLint / Prettier |
 | `npm run build` | Typecheck + production build to `out/` |
 
+**Demo with the real controller:** `ZOOMIES_INVERT_Y=1 npm run dev` — this board's joystick is
+physically mounted upside-down, so without the flag the launch throws in the wrong direction.
+Verified on Windows 2026-10-04 with the real Arduino board on COM4 (joystick aim/launch, button
+tap=call, hold=push-to-talk, touch=pet, buzzer squeak/chirp, unplug/replug reconnect — all pass
+with this flag set).
+
 Pipeline (`pipeline/`): Python 3.11+ venv, `pip install -r requirements.txt`, `pytest`.
 
 ## File structure
