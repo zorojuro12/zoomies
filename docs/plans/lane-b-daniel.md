@@ -14,7 +14,7 @@
 | `pipeline/` | Python build-time reconstruction: cut-out → landmarks → placement → (optimiser) → coat colours → dog file |
 | `app/src/renderer/dog/` | SDF body ray-marcher, splat coat pass, skeleton, pose library, procedural gait + IK, secondary motion, `DogView` + `DogController` implementations |
 | `app/src/renderer/ui/editor/` | Pose & shape editor (sliders) |
-| `app/preview.html` (+ entry) | **Standalone dog preview page** — the dog in a normal window, no overlay, works on Mac |
+| `app/src/renderer/preview.html` + `preview.ts` | **Standalone dog preview page** — the dog in a normal window, no overlay, works on Mac. Already scaffolded with the placeholder dog: run `npm run dev` and open `/preview.html` on the dev server in a browser |
 | `assets/dog/*.dog.json` | Generated dog files (`placeholder.dog.json` comes from P0 contracts) |
 | `app/src/shared/dog-file.ts` + schema | Dog file contract (shared; you're its primary owner) |
 
@@ -40,7 +40,7 @@ Measuring limb lengths from pixel landmarks is fragile (one bad point skews a wh
 - **Colour snap:** extract the photo's 5–6 dominant colours (k-means) and move each Gemini hex to the nearest real photo colour — Gemini decides *which colour goes where*, the photo supplies the exact paint. Fallback: default Aussie palette.
 - Pixel landmarks (`landmarks.json`) become **optional**, used only by the P3 silhouette optimiser if there's time. Abel's landmark picker is off the critical path.
 
-### Landmarks format (optional — only for the P3 optimiser)
+### Landmarks format — contract §3.9 (`app/src/shared/landmarks.ts`); optional, only for the P3 optimiser
 `assets/views/landmarks.json`:
 ```json
 {
@@ -64,7 +64,7 @@ Abel generates **two side views**: `side_sit` (same sitting pose as the photo, o
 
 ## P1 — Spike: does the SDF dog read as *this* dog?
 **Goal:** answer the project's #1 risk early, on your Mac, without waiting for anyone.
-- [ ] **Preview page:** `preview.html` — orthographic camera, transparent/grey background toggle, turntable, pose buttons, FPS/frame-time readout. Your dev harness for the whole weekend.
+- [ ] **Preview page:** `app/src/renderer/preview.html` already exists with the placeholder dog, pose/walk/run/jump/ball buttons, a background toggle and a frame-time readout. Add a turntable and swap in your SDF dog. Your dev harness for the whole weekend.
 - [ ] **Skeleton in code:** bones per §3.3 (spine, neck, head, jaw, ears, 4 × 2-segment legs + paws, tail chain); forward kinematics; rest pose standing.
 - [ ] **SDF ray-marcher:** fragment shader over a screen-space quad around the dog; ~20 primitives (sphere / capsule / ellipsoid / round cone) in bone space, combined with smooth-min (`blend` per shape); soft/toon lighting; per-shape base colour; writes `gl_FragDepth` (needed later for the coat). Step + distance limits for cost.
 - [ ] **Pipeline v1 — Gemini dog spec** (see "Dog spec" above): standard Aussie template dog file → Gemini call(s) return ratios + ear/tail type + region colours → median, clamp to template ranges → scale bones/shapes → `assets/dog/aussie.dog.json` (validated against the schema). Template-only fallback if Gemini fails. (`rembg` cut-out only if the colour snap needs it.)

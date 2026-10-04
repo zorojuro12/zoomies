@@ -39,9 +39,9 @@
 
 ## P0 — Setup & contracts
 - [ ] GitHub: add Abel, `dev` default, protect `main` + `dev`, merge commits only.
-- [ ] `a/scaffold` — everything in `00-shared.md` §2.2 (electron-vite TS app, pipeline/, hardware/, scripts/, assets/, root files, README, `CLAUDE.md`).
+- [x] `a/scaffold` — everything in `00-shared.md` §2.2 (electron-vite TS app, pipeline/, hardware/, scripts/, assets/, root files, README, `CLAUDE.md`).
 - [ ] Claude tooling: trim `.claude/` (Tier 1 + path-scoped Tier 2), add `rules/hackathon-workflow.md`, adapt finishing/executing/`/pr` to "PR into `dev`"; `/context` check; zip for Abel.
-- [ ] `a/contracts` (with Daniel + Abel) — `app/src/shared/*` from `00-shared.md` §3 plus stubs: `StubOsLayer`, `PlaceholderDog`, `placeholder.dog.json`.
+- [x] `a/contracts` — pre-drafted and merged (2026-10-03): `app/src/shared/*`, `StubOsLayer`, `PlaceholderDog`, `placeholder.dog.json`, `StubAudio`, preview page. **Still to do:** review it with Daniel + Abel; changes via small PRs.
 - **Done when:** CP0 — app launches on all three machines with the placeholder dog.
 
 ## P1 — Spikes: prove the Windows overlay
@@ -74,6 +74,7 @@
 - [ ] **Window terrain:** platforms from window top edges + taskbar; route with walks + `jumpTo` arcs; ride a dragged window (follow its delta, jump off on large acceleration); fall + stumble when the window under the dog closes; **peek from behind** (dog behind a higher-z window is masked by that window's rect, peeks at the edge).
 - [ ] **ElevenLabs L2:** push-to-talk records mic → STT → `command` event; ears perk on press; clickable command buttons as fallback.
 - [ ] **Gemini G3:** free text → function-call to a dog action; fixed command list as fallback.
+- [ ] **Keys:** load `.env` in the main process with Node's built-in `process.loadEnvFile()` (no extra package); never pass keys to the renderer.
 - [ ] **Gemini G2:** load the personality profile (generated once from the photo) into needs-model parameters; window-herding trick for the Aussie.
 - **Hand-off rule:** if behind at mid-P3, hand L2/G2/G3 to Daniel once the dog is stable.
 - **Tests:** serial parser (good/bad lines); landing prediction vs simulated result; platform graph from window rects; command mapping.
