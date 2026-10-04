@@ -34,6 +34,7 @@ Yaw follows the move direction (left/right ±25°, up the screen → turned away
 - **Done when:** `run ↔` and `jump` visibly turn the body; a hand-made "run up" test shows the back view.
 
 ### T5 — Look check and go/no-go (~20 min)
+> **Moved (2026-10-03):** the dog on screen is the placeholder, not fitted to the photo, so a likeness check now is premature. T5 is replaced by step B of `b-p2-spec-and-motion.md` (hand-written Aussie spec, then the side-by-side). The rendering itself (clay look, lighting, 3D turning) is judged done at T4.
 Side-by-side screenshots (stand, sit, run, run-up) next to `assets/photo/dog.jpeg`. Daniel and Claude decide: continue with this approach, or change the view/approach.
 
 ## Risks
