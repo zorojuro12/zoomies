@@ -169,9 +169,9 @@ export function buildDog(input: unknown): DogFile {
   ] as const) {
     add(
       `eye_${side}`,
-      'sphere',
+      'ellipsoid', // a ball, but an ellipsoid so its height can squash for a blink (see SdfDog)
       'head',
-      [2.8 * hs],
+      [2.8 * hs, 2.8 * hs, 2.8 * hs],
       [12.1 * hs, -3.2 * hs, z * 10 * hs], // on the front of the head surface, facing forward
       0.5,
       'eyes'

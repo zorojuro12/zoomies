@@ -12,6 +12,7 @@ import type { Point, Rect } from '@shared/geometry'
 import { DogMotion } from '../motion/dog-motion'
 import { shapeBound, unionSphereInto } from './bounds'
 import { debugColor, debugFlags } from './debug-view'
+import { createBlink, stepBlink } from '../motion/blink'
 import type { Sphere } from './bounds'
 import { MAX_SHAPES, SDF_FRAG, SDF_VERT } from './sdf-shader'
 
@@ -43,6 +44,10 @@ export class SdfDog implements DogView, DogController {
   private skelLines: THREE.LineSegments | null = null
   private skelPoints: THREE.Points | null = null
   private boneNames: string[] = []
+  // blinking: the eyes' vertical radius shrinks for a moment every few seconds
+  private readonly blink = createBlink(1)
+  private eyeIdx: number[] = []
+  private eyeRy: number[] = []
   private boneParent: number[] = []
   private showSkeleton = false
   private readonly skelPos = new THREE.Vector3()
@@ -147,6 +152,14 @@ export class SdfDog implements DogView, DogController {
     })
     this.uniforms.uCount.value = dog.shapes.length
     this.shadowW = dog.heightPx * 1.4
+    this.eyeIdx = []
+    this.eyeRy = []
+    dog.shapes.forEach((sh, i) => {
+      if (sh.id === 'eye_l' || sh.id === 'eye_r') {
+        this.eyeIdx.push(i)
+        this.eyeRy.push(sh.params[1] ?? sh.params[0] ?? 1)
+      }
+    })
     this.buildSkeleton(dog)
   }
 
@@ -235,6 +248,12 @@ export class SdfDog implements DogView, DogController {
     if (!this.motion || !this.camera || !this.quad || !this.shadow) return
     this.motion.update(dtMs) // poses the skeleton and refreshes world matrices
 
+    // Blink: squash each eye's height (axis y of the head frame) toward a thin slit and back.
+    const closed = stepBlink(this.blink, dtMs / 1000)
+    for (let k = 0; k < this.eyeIdx.length; k++) {
+      this.uniforms.uParams.value[this.eyeIdx[k]!]!.y = this.eyeRy[k]! * (1 - 0.92 * closed)
+    }
+
     // Per shape: the world -> shape-local matrix, and the world position of its bounding sphere.
     const inv = this.uniforms.uInv.value
     const bounds = this.uniforms.uBound.value
@@ -264,10 +283,19 @@ export class SdfDog implements DogView, DogController {
 
     this.updateSkeleton()
 
-    // Shadow sits under the paws.
+    // Shadow stays on the GROUND under the dog (not under its paws), and shrinks and fades as the
+    // dog rises off it, like a real contact shadow.
     const s = this.motion.getState()
-    this.shadow.position.set(s.x, s.y + 2, -80)
-    this.shadow.scale.set(this.shadowW, this.shadowW * 0.2, 1)
+    const ground = this.motion.getGroundY()
+    const lift = Math.max(0, ground - s.y)
+    const fade = Math.min(1, lift / (this.shadowW * 1.2))
+    this.shadow.position.set(s.x, ground + 2, -80)
+    this.shadow.scale.set(
+      this.shadowW * (1 - 0.35 * fade),
+      this.shadowW * 0.2 * (1 - 0.35 * fade),
+      1
+    )
+    ;(this.shadow.material as THREE.MeshBasicMaterial).opacity = 1 - 0.65 * fade
   }
 
   getBounds(): Rect {

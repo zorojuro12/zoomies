@@ -295,6 +295,15 @@ export class DogMotion implements DogController {
     this.ball.visible = attached
   }
 
+  /**
+   * The y of the ground under the dog. It stays put while the dog is in the air (the lower of the
+   * take-off and landing levels), so the shadow stays on the ground instead of rising with a jump.
+   */
+  getGroundY(): number {
+    const m = this.motion
+    return m.kind === 'jump' ? Math.max(m.y0, m.ty) : this.y
+  }
+
   getState(): DogState {
     const pose =
       this.motion.kind === 'move'
