@@ -12,6 +12,8 @@ import { normalizeSpec } from './dog/spec/dog-spec'
 import { mountSpecEditor } from './ui/editor/spec-editor'
 import { createRenderContext, loadJson } from './host/scene'
 import { createAudioPlayer } from './audio'
+import { PetHand } from './dog/hand/hand-view'
+import { headAnchor } from './dog/hand/head-anchor'
 import { Behaviour } from './behaviour/behaviour'
 import { BuzzerCues } from './behaviour/buzzer-cues'
 import { SoundCues } from './behaviour/cues'
@@ -215,6 +217,18 @@ async function start(): Promise<void> {
       buzzUntil = performance.now() + 1500
     })
     behaviour?.onEvent((e) => buzzer.handle(e))
+    // the pet hand: a white glove strokes the dog's head whenever it is petted (touch or mouse)
+    const hand = new PetHand(ctx.scene)
+    const headPoint = { x: 0, y: 0 }
+    behaviour?.onEvent((e) => {
+      if (e.kind === 'pet') hand.play()
+    })
+    if (behaviour) {
+      window.addEventListener('click', (e) => {
+        if (dog.hitTest(e.clientX, e.clientY))
+          behaviour.handleInput({ kind: 'pet', source: 'mouse' })
+      })
+    }
     const fetch = behaviour ? behaviour.fetch : new Fetch({ dog, ball, world, groundY })
     fetch.onNote((n) => console.log('[fetch]', n))
     const shelf = {
@@ -357,7 +371,7 @@ async function start(): Promise<void> {
       button('tire out', () => {
         behaviour.needs.energy = 0.1
       })
-      button('pet', () => behaviour.handleInput({ kind: 'pet', source: 'mouse' }))
+      button('pet (touch sensor)', () => behaviour.handleInput({ kind: 'pet', source: 'touch' }))
       // the controller, faked: the joystick pulled back, the button tapped / held, a double-click = call
       button('joystick aim 2 s', () => {
         let n = 0
@@ -385,6 +399,7 @@ async function start(): Promise<void> {
         buzzer.update(dtMs)
       } else fetch.update(dtMs)
       worldView.setBall(fetch.carrying ? hiddenBall : ball) // hidden while it is in the dog's mouth
+      if (hand.playing) hand.update(dtMs, headPoint, headAnchor(dog, headPoint))
       fetchState = behaviour ? behaviour.describe() : `fetch ${fetch.state}`
       if (performance.now() < buzzUntil) fetchState += ` · buzzer: ${buzzText}`
     }

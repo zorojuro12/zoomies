@@ -633,6 +633,17 @@ describe('events (what the sounds listen to)', () => {
     expect(ev.some((e) => e.kind === 'pet')).toBe(true)
   })
 
+  it('a pet says where it came from (the touch sensor or the mouse)', () => {
+    const touch = mk()
+    const t = collect(touch)
+    touch.b.handleInput({ kind: 'pet', source: 'touch' })
+    expect(t.find((e) => e.kind === 'pet')).toEqual({ kind: 'pet', source: 'touch' })
+    const mouseH = mk()
+    const m = collect(mouseH)
+    mouseH.b.handleInput({ kind: 'pet', source: 'mouse' })
+    expect(m.find((e) => e.kind === 'pet')).toEqual({ kind: 'pet', source: 'mouse' })
+  })
+
   it('you can stop listening', () => {
     const h = mk()
     const ev: BehaviourEvent[] = []

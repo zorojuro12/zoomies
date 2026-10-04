@@ -10,7 +10,7 @@
 | Phase | What | Status |
 |---|---|---|
 | **A** | **What the controller means:** `main/hardware/controller-mapper.ts` (raw messages -> `InputEvent`s), the dog's reactions to `aim` / `call` / `pushToTalk` (and the joystick / button counting as user activity), `behaviour/buzzer-cues.ts` (when the buzzer goes) | built (PR) |
-| **A2** | **The pet hand:** a white cartoon glove slides down and strokes the dog's head for about 2.4 s when a `pet` happens (touch or mouse), `dog/hand/` | next |
+| **A2** | **The pet hand:** a white cartoon glove slides down and strokes the dog's head for about 2.4 s when a `pet` happens (touch or mouse), `dog/hand/` | built (PR, stacked on A) |
 | **B** | **The reader:** `serialport`, auto-detect by `HELLO:zoomies:1` (repeats every 2 s forever: a repeat is a no-op), reconnect on unplug, fake port in tests | |
 | **C** | **Wiring:** main process + preload + `main.ts` (forward `input:event`, `serial:status`, `serial:buzzer`; HUD status; double-click = call) | |
 

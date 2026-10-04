@@ -3,6 +3,8 @@
 import type { Rect } from '@shared/geometry'
 import type { ActivityEvent, WindowRect } from '@shared/os'
 import { createAudioPlayer } from './audio'
+import { PetHand } from './dog/hand/hand-view'
+import { headAnchor } from './dog/hand/head-anchor'
 import { Behaviour } from './behaviour/behaviour'
 import { SoundCues } from './behaviour/cues'
 import { FrameGovernor } from './behaviour/fps'
@@ -136,6 +138,16 @@ async function start(): Promise<void> {
     })
     brain.onEvent((e) => cues?.handle(e))
   }
+  // The pet hand: a white glove strokes the dog's head whenever it is petted (the touch sensor or a click).
+  let hand: PetHand | null = null
+  const headPoint = { x: 0, y: 0 }
+  if (behaviour) {
+    const petHand = new PetHand(ctx.scene)
+    hand = petHand
+    behaviour.onEvent((e) => {
+      if (e.kind === 'pet') petHand.play()
+    })
+  }
   const governor = new FrameGovernor()
   // What the world draws while the dog has the ball in its mouth (nothing: radius 0).
   const hiddenBall: Ball = { ...ball, r: 0 }
@@ -256,6 +268,7 @@ async function start(): Promise<void> {
     worldView.setBall(behaviour?.fetch.carrying ? hiddenBall : ball)
     if (!behaviour && !ball.resting) dog.lookAt({ x: ball.x, y: ball.y })
     dog.update(frameMs)
+    if (hand?.playing) hand.update(frameMs, headPoint, headAnchor(dog, headPoint))
     ctx.renderer.render(ctx.scene, ctx.camera)
     const workMs = performance.now() - workStart
     stats.add(frameMs, workMs)

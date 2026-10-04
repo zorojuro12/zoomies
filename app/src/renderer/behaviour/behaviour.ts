@@ -61,7 +61,7 @@ export type BehaviourEvent =
   | { kind: 'fetch'; note: FetchNote }
   | { kind: 'activity'; note: ActivityNote }
   | { kind: 'reaction'; id: string; phase: 'start' | 'end' }
-  | { kind: 'pet' }
+  | { kind: 'pet'; source: 'touch' | 'mouse' }
   | { kind: 'call' }
   | { kind: 'talk'; state: 'start' | 'stop' }
   /** The ball bounced at x; strength 0..1 follows how hard it hit. */
@@ -217,7 +217,7 @@ export class Behaviour {
     } else if (e.kind === 'pet') {
       applyNeedsEvent(this.needs, 'pet')
       if (this.arbiter.request('command', 'pet', 1, PET_HOLD_MS)) {
-        this.emit({ kind: 'pet' })
+        this.emit({ kind: 'pet', source: e.source })
         this.commandHoldMs = PET_HOLD_MS
         this.petting = true
         void this.dog.setPose('headTilt')
